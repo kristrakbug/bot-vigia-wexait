@@ -1,8 +1,10 @@
 import time
-import re
 import requests
 from datetime import datetime
 import pytz
+
+# Importamos el gestor de navegador headless moderno
+from playwright.sync_api import sync_playwright
 
 # ==============================================================================
 # 1. CONFIGURACIÓN PRINCIPAL
@@ -45,65 +47,80 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 2. MOTOR DE SCRAPING DE MEMORIA NUXT (SIN SELENIUM)
+# 2. MOTOR VISUAL RENDERING (PLAYWRIGHT)
 # ==============================================================================
 def verificar_stock_proveedor():
-    print("\n[+] Extrayendo memoria de estado (Nuxt JSON) desde Mayflux...")
-    sesion = requests.Session()
+    print("\n[+] Iniciando motor visual (Playwright) para procesar Mayflux...")
     
-    sesion.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.9',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-    })
-
-    try:
-        sesion.post(URL_BASE_MAYFLUX, data={'username': CORREO_PROVEEDOR, 'password': CONTRASENA_PROVEEDOR, 'login': 'Login'}, timeout=15)
-    except:
-        pass
-
-    for prod in PRODUCTOS_A_VIGILAR:
+    with sync_playwright() as p:
+        # Lanzamos Chromium optimizado para servidores sin pantalla
+        navegador = p.chromium.launch(headless=True, chromium_sandbox=False)
+        contexto = navegador.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
+        )
+        pagina = contexto.new_page()
+        
+        # Opcional: Intento de inicio de sesión visual
         try:
-            respuesta = sesion.get(prod["url_proveedor"], timeout=15)
+            print("[*] Cargando portal de acceso...")
+            pagina.goto(URL_BASE_MAYFLUX, timeout=30000)
+            # Damos tiempo a que la app cargue su JS
+            pagina.wait_for_load_state("networkidle", timeout=10000)
             
-            if respuesta.status_code != 200:
-                print(f"[!] Acceso denegado a {prod['nombre']} (HTTP {respuesta.status_code})")
-                continue
-
-            texto_html = respuesta.text
-            
-            # --- BÚSQUEDA DIRECTA EN EL CÓDIGO FUENTE DE NUXT ---
-            bloque_nuxt = re.search(r'window\.__NUXT__\s*=\s*(\(.*?\));', texto_html)
-            if not bloque_nuxt:
-                bloque_nuxt = re.search(r'<script[^>]*>.*?(?:__NUXT__|"stock").*?</script>', texto_html, re.DOTALL)
-            
-            area_busqueda = bloque_nuxt.group(0).lower() if bloque_nuxt else texto_html.lower()
-
-            patrones_agotado = ['"stock":0', '"stock": 0', 'stock: 0', '"quantity":0', '"outofstock"', 'producto agotado']
-            patrones_disponible = ['"stock":', 'stock:', 'añadir al carrito', 'add to cart']
-
-            if any(p in area_busqueda for p in patrones_agotado):
-                hay_stock = False
-            elif any(p in area_busqueda for p in patrones_disponible):
-                hay_stock = True
-            else:
-                print(f"[?] Metadatos incompletos para {prod['nombre']}. Protegiendo con etiqueta (OFF).")
-                hay_stock = False
-
-            actualizar_producto_wexait(prod["id_wexait"], hay_stock, prod["nombre"])
-            time.sleep(2)
-
+            # Buscamos inputs de login si están visibles
+            if pagina.locator("input[type='password']").is_visible():
+                pagina.locator("input[type='email'], input[name*='user']").first.fill(CORREO_PROVEEDOR)
+                pagina.locator("input[type='password']").fill(CONTRASENA_PROVEEDOR)
+                pagina.locator("input[type='password']").press("Enter")
+                pagina.wait_for_load_state("networkidle", timeout=10000)
+                print("[*] Autenticación visual completada.")
         except Exception as e:
-            print(f"[!] Error procesando {prod['nombre']}: {e}")
+            print("[?] Omitiendo login (sesión guardada o interfaz no detectada).")
+
+        # Recorremos el catálogo
+        for prod in PRODUCTOS_A_VIGILAR:
+            print(f"[*] Inspeccionando visualmente: {prod['nombre']}...")
+            try:
+                # Navegamos y esperamos a que la página termine de procesar sus peticiones internas
+                pagina.goto(prod["url_proveedor"], timeout=40000)
+                pagina.wait_for_load_state("networkidle", timeout=15000)
+                
+                # Pausa extra de 3 segundos para que las animaciones o textos de Nuxt terminen de aparecer
+                pagina.wait_for_timeout(3000)
+                
+                # Extraemos todo el texto visible renderizado por el navegador
+                contenido_visual = pagina.content().lower()
+                
+                # --- VERIFICACIÓN DIRECTA EN PANTALLA ---
+                es_agotado = ("stock: 0" in contenido_visual) or ("producto agotado" in contenido_visual) or ("out of stock" in contenido_visual)
+                es_disponible = ("añadir al carrito" in contenido_visual) or ("agregar" in contenido_visual) or ("stock:" in contenido_visual and "stock: 0" not in contenido_visual)
+                
+                if es_agotado:
+                    hay_stock = False
+                elif es_disponible:
+                    hay_stock = True
+                else:
+                    print(f"[?] No se detectaron botones clave en pantalla. Protegiendo con (OFF).")
+                    hay_stock = False
+                    
+                actualizar_producto_wexait(prod["id_wexait"], hay_stock, prod["nombre"])
+                
+            except Exception as e:
+                print(f"[!] Error cargando la vista de {prod['nombre']}: {e}")
+            
+            time.sleep(2)
+            
+        contexto.close()
+        navegador.close()
+        print("[*] Motor visual cerrado correctamente.")
 
 # ==============================================================================
-# 3. BUCLE DE TIEMPO (HORARIO EXTENDIDO HASTA LAS 4 AM)
+# 3. BUCLE DE TIEMPO (HASTA LAS 4 AM)
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA (SCRAPER DE MEMORIA NUXT) INICIADO")
+    print("🚀 BOT VIGÍA (PLAYWRIGHT VISUAL) INICIADO")
     print("=======================================================")
 
     while True:
@@ -114,7 +131,7 @@ def iniciar_vigilancia():
             print(f"[*] Esperando 30 minutos...")
             time.sleep(1800)
         else:
-            print(f"[{ahora.strftime('%I:%M %p')}] Mantenimiento programado (5 AM - 8 AM).")
+            print(f"[{ahora.strftime('%I:%M %p')}] Mantenimiento (5 AM - 8 AM).")
             time.sleep(900)
 
 if __name__ == "__main__":
