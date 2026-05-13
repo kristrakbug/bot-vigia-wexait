@@ -51,7 +51,7 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 2. MOTOR DE SCRAPING CON RUTAS NATIVAS FORZADAS
+# 2. MOTOR DE SCRAPING CON NAVEGADOR COMPLETO (APT NATIVO)
 # ==============================================================================
 def verificar_stock_proveedor():
     print("\n[+] Iniciando Chromium nativo en el servidor para leer Mayflux...")
@@ -64,10 +64,9 @@ def verificar_stock_proveedor():
     opciones.add_argument("--window-size=1920,1080")
     opciones.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 
-    # --- EL TRUCO MAESTRO ---
-    # Buscamos las rutas exactas del binario que instaló nixpacks en el sistema operativo
+    # Mapeamos las rutas de binarios nativos instalados por APT
     ruta_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
-    ruta_chromedriver = shutil.which("chromedriver")
+    ruta_chromedriver = shutil.which("chromedriver") or shutil.which("chromium-driver")
 
     if ruta_chromium:
         opciones.binary_location = ruta_chromium
@@ -75,7 +74,7 @@ def verificar_stock_proveedor():
 
     driver = None
     try:
-        # Le pasamos explícitamente el Servicio nativo para bloquear la descarga automática
+        # Obligamos a Selenium a usar el ejecutable nativo del sistema
         if ruta_chromedriver:
             print(f"[*] Driver nativo detectado en: {ruta_chromedriver}")
             servicio = Service(executable_path=ruta_chromedriver)
@@ -102,7 +101,7 @@ def verificar_stock_proveedor():
             print(f"[*] Consultando: {prod['nombre']}...")
             driver.get(prod["url_proveedor"])
             
-            # Pausa estricta para que Nuxt.js procese y renderice la página visual
+            # Pausa de renderizado indispensable para Nuxt.js
             time.sleep(5) 
             
             texto_renderizado = driver.page_source.lower()
@@ -122,7 +121,7 @@ def verificar_stock_proveedor():
             time.sleep(2)
 
     except Exception as e:
-        print(f"[!] Error en el navegador invisible: {e}")
+        print(f"[!] Error crítico en el navegador invisible: {e}")
     finally:
         if driver:
             driver.quit()
@@ -133,13 +132,13 @@ def verificar_stock_proveedor():
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA (RUTAS NATIVAS FORZADAS) INICIADO")
+    print("🚀 BOT VIGÍA (SELENIUM NATIVO BLINDADO) INICIADO")
     print("=======================================================")
 
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
         
-        # Trabaja si son las 8 AM en adelante, O si es la madrugada hasta las 4:59 AM
+        # Activo desde las 8 AM en adelante, O en la madrugada hasta las 4:59 AM
         if ahora.hour >= 8 or ahora.hour <= 4:
             verificar_stock_proveedor()
             print(f"[*] Esperando 30 minutos...")
