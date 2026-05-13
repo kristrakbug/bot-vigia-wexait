@@ -138,7 +138,7 @@ async function verificarStockProveedor() {
 }
 
 // ==============================================================================
-// 3. BUCLE DE TIEMPO (HORARIO COLOMBIA - EXTENDIDO HASTA LAS 4 AM)
+// 3. BUCLE DE TIEMPO (HORARIO NORMAL DEFINITIVO: 8 AM - 12 AM)
 // ==============================================================================
 function obtenerHoraColombia() {
     const ahora = new Date();
@@ -149,20 +149,21 @@ function obtenerHoraColombia() {
 
 async function iniciarVigilancia() {
     console.log("=======================================================");
-    console.log("🚀 BOT VIGÍA MODO PRODUCCIÓN REAL (Sincronización JS) INICIADO");
+    console.log("🚀 BOT VIGÍA MODO PRODUCCIÓN REAL (Horario Normal) INICIADO");
     console.log("=======================================================");
 
     while (true) {
         const horaActual = obtenerHoraColombia();
         
-        // Ejecuta si la hora es >= 8 (8 AM a 11 PM) O <= 4 (12 AM a 4:59 AM)
-        if (horaActual >= 8 || horaActual <= 4) {
+        // ⏰ Horario Normal: Activo estrictamente si la hora es >= 8 (de 8:00 AM a 11:59 PM)
+        // Desde las 0 (12:00 AM) hasta las 7 (7:59 AM) entrará al descanso automáticamente.
+        if (horaActual >= 8) {
             await verificarStockProveedor();
             console.log("[*] Misión terminada. Esperando 30 minutos para el siguiente escaneo...");
             await new Promise(r => setTimeout(r, 1800000)); // 30 minutos
         } else {
-            console.log("[Madrugada COP] Horario inactivo. Bot en reposo de seguridad (5 AM - 8 AM).");
-            await new Promise(r => setTimeout(r, 900000)); // 15 minutos
+            console.log("[Noche COP] Horario inactivo. Bot en reposo nocturno (12 AM - 8 AM).");
+            await new Promise(r => setTimeout(r, 900000)); // Espera bloques de 15 min hasta las 8 AM
         }
     }
 }
