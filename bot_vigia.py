@@ -17,7 +17,7 @@ ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 
 URL_LOGIN_MAYFLUX = "https://mayflux.com/my-account/" 
 CORREO_PROVEEDOR = "Univedson1@gmail.com"        
-CONTRASENA_PROVEEDOR = "TU_CONTRASEÑA_REAL_AQUI"  # <-- RECUERDA PONER TU CLAVE REAL
+CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"  # <-- RECUERDA PONER TU CLAVE REAL
 
 PRODUCTOS_A_VIGILAR = [
     {
