@@ -9,17 +9,15 @@ import pytz
 # ==============================================================================
 URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto"
 TOKEN_SECRETO = "WexaitBot2026_Admin"
-
 ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 
 # ==============================================================================
 # 2. CONFIGURACIÓN DEL PROVEEDOR (MAYFLUX)
 # ==============================================================================
-URL_LOGIN_MAYFLUX = "https://mayflux.com/my-account/" 
-CORREO_PROVEEDOR = "Univedson1@gmail.com"        # <-- PON TU CORREO DE MAYFLUX
-CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"     # <-- PON TU CONTRASEÑA DE MAYFLUX
+URL_LOGIN_MAYFLUX = "https://mayflux.com" 
+CORREO_PROVEEDOR = "Univedson1@gmail.com"        # <-- TU CORREO REAL
+CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"     # <-- TU CONTRASEÑA REAL
 
-# --- LISTA MAESTRA DE PRODUCTOS ---
 PRODUCTOS_A_VIGILAR = [
     {
         "id_wexait": 5,
@@ -39,7 +37,7 @@ PRODUCTOS_A_VIGILAR = [
 ]
 
 # ==============================================================================
-# 3. FUNCIÓN DE ACTUALIZACIÓN A LA WEB (SILENCIOSA)
+# 3. FUNCIÓN DE ACTUALIZACIÓN (SILENCIOSA)
 # ==============================================================================
 def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
     estado = 1 if hay_stock else 0
@@ -49,90 +47,70 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         if res.status_code == 200:
             accion = "🟢 DISPONIBLE" if estado == 1 else "🔴 AGOTADO (off)"
             print(f"[*] Wexait sincronizado: {nombre_referencia} -> {accion}")
-        else:
-            print(f"[!] Falló actualización en Wexait para ID {producto_id}. HTTP {res.status_code}")
-    except Exception as e:
-        print(f"[!] Error conectando a Wexait: {e}")
+    except:
+        print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 4. EL MOTOR DE LECTURA (SCRAPER CON SESIÓN)
+# 4. EL MOTOR DE LECTURA (SCRAPER BASADO EN TU CAPTURA)
 # ==============================================================================
 def verificar_stock_proveedor():
     print("\n[+] Iniciando revisión de inventario en Mayflux...")
-    
-    # Creamos la sesión para mantener las cookies de inicio de sesión
     sesion = requests.Session()
     sesion.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     })
 
-    # 1. INICIAR SESIÓN EN EL PROVEEDOR
-    datos_login = {
-        'username': CORREO_PROVEEDOR,
-        'password': CONTRASENA_PROVEEDOR,
-        'login': 'Login'
-    }
-    
+    # Iniciar Sesión
     try:
-        sesion.post(URL_LOGIN_MAYFLUX, data=datos_login, timeout=15)
-    except Exception as e:
-        print(f"[!] Advertencia al iniciar sesión en Mayflux: {e}")
+        sesion.post(URL_LOGIN_MAYFLUX, data={'username': CORREO_PROVEEDOR, 'password': CONTRASENA_PROVEEDOR, 'login': 'Login'}, timeout=15)
+    except:
+        pass
 
-    # 2. RECORRER CADA PRODUCTO DE LA LISTA
     for prod in PRODUCTOS_A_VIGILAR:
-        id_wexait = prod["id_wexait"]
-        url_prov = prod["url_proveedor"]
-        nombre = prod["nombre"]
-        
         try:
-            respuesta = sesion.get(url_prov, timeout=15)
-            texto_html = respuesta.text.lower()
+            respuesta = sesion.get(prod["url_proveedor"], timeout=15)
+            soup = BeautifulSoup(respuesta.text, 'html.parser')
             
-            # --- LÓGICA DE DETECCIÓN INTELIGENTE ---
-            if "producto agotado" in texto_html:
+            # BUSQUEDA BASADA EN TU INSPECTOR:
+            # 1. Buscamos el botón que tenga el texto de stock
+            texto_pagina = respuesta.text.lower()
+            
+            # Prioridad 1: Si el botón tiene el atributo 'disabled', está agotado fijo.
+            # Según tu captura, el botón de agotado tiene disabled=""
+            boton_desactivado = soup.find('button', attrs={'disabled': True})
+            
+            if "producto agotado" in texto_pagina and boton_desactivado:
                 hay_stock = False
-            elif "añadir al carrito" in texto_html:
+            elif "añadir al carrito" in texto_pagina:
+                # Verificamos que no sea un botón desactivado
                 hay_stock = True
             else:
-                # Respaldo buscando las clases nativas de WooCommerce
-                soup = BeautifulSoup(respuesta.text, 'html.parser')
-                if soup.find(class_="out-of-stock"):
-                    hay_stock = False
-                else:
-                    hay_stock = True
-            
-            # Enviamos la orden directa a tu página web
-            actualizar_producto_wexait(id_wexait, hay_stock, nombre)
-            
-            # Pausa de 2 segundos entre cada producto para cuidar la conexión
+                # Si hay duda, buscamos la frase exacta en el HTML
+                hay_stock = "añadir al carrito" in texto_pagina and "producto agotado" not in texto_pagina
+
+            actualizar_producto_wexait(prod["id_wexait"], hay_stock, prod["nombre"])
             time.sleep(2)
             
         except Exception as e:
-            print(f"[!] Error al leer el producto {nombre} en Mayflux: {e}")
+            print(f"[!] Error en {prod['nombre']}: {e}")
 
 # ==============================================================================
-# 5. EL BUCLE INTERNO DE TIEMPO
+# 5. BUCLE DE TIEMPO
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA SILENCIOSO INICIADO (Horario Colombia)")
+    print("🚀 BOT VIGÍA PRECISO INICIADO (Horario Colombia)")
     print("=======================================================")
 
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
-        hora = ahora.hour
-        hora_str = ahora.strftime('%I:%M %p')
-
-        # Trabaja estrictamente entre las 8:00 AM y las 11:59 PM
-        if 8 <= hora <= 23:
-            print(f"\n[{hora_str} COP] Verificando inventario...")
+        if 8 <= ahora.hour <= 23:
             verificar_stock_proveedor()
-            
-            print("[*] Ciclo terminado. Esperando 30 minutos...")
-            time.sleep(1800) # Duerme 30 minutos
+            print(f"[*] Esperando 30 minutos... (Próxima revisión: {(ahora.hour if ahora.minute < 30 else ahora.hour+1)}:{(ahora.minute+30)%60:02d})")
+            time.sleep(1800)
         else:
-            print(f"[{hora_str} COP] Madrugada en Colombia. Bot en reposo.")
-            time.sleep(900) # En la madrugada solo revisa la hora cada 15 minutos
+            print(f"[{ahora.strftime('%I:%M %p')}] Reposo nocturno.")
+            time.sleep(900)
 
 if __name__ == "__main__":
     iniciar_vigilancia()
