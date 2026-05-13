@@ -1,14 +1,8 @@
 import time
+import re
 import requests
 from datetime import datetime
 import pytz
-import shutil
-
-# Librerías de Selenium
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 
 # ==============================================================================
 # 1. CONFIGURACIÓN PRINCIPAL
@@ -17,7 +11,7 @@ URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto"
 TOKEN_SECRETO = "WexaitBot2026_Admin"
 ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 
-URL_LOGIN_MAYFLUX = "https://mayflux.com" 
+URL_BASE_MAYFLUX = "https://mayflux.com/" 
 CORREO_PROVEEDOR = "Univedson1@gmail.com"        
 CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"  # <-- RECUERDA PONER TU CLAVE REAL
 
@@ -51,100 +45,85 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 2. MOTOR DE SCRAPING CON NAVEGADOR COMPLETO (APT NATIVO)
+# 2. MOTOR DE SCRAPING DE MEMORIA NUXT (SIN NAVEGADOR)
 # ==============================================================================
 def verificar_stock_proveedor():
-    print("\n[+] Iniciando Chromium nativo en el servidor para leer Mayflux...")
+    print("\n[+] Extrayendo memoria de estado (Nuxt JSON) desde Mayflux...")
+    sesion = requests.Session()
     
-    opciones = Options()
-    opciones.add_argument("--headless=new") 
-    opciones.add_argument("--no-sandbox")
-    opciones.add_argument("--disable-dev-shm-usage")
-    opciones.add_argument("--disable-gpu")
-    opciones.add_argument("--window-size=1920,1080")
-    opciones.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    # Inyectamos cabeceras estrictas de navegador para evitar bloqueos de firewall
+    sesion.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+    })
 
-    # Mapeamos las rutas de binarios nativos instalados por APT
-    ruta_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
-    ruta_chromedriver = shutil.which("chromedriver") or shutil.which("chromium-driver")
-
-    if ruta_chromium:
-        opciones.binary_location = ruta_chromium
-        print(f"[*] Binario de Chromium detectado en: {ruta_chromium}")
-
-    driver = None
+    # Opcional: Intento rápido de login silencioso
     try:
-        # Obligamos a Selenium a usar el ejecutable nativo del sistema
-        if ruta_chromedriver:
-            print(f"[*] Driver nativo detectado en: {ruta_chromedriver}")
-            servicio = Service(executable_path=ruta_chromedriver)
-            driver = webdriver.Chrome(service=servicio, options=opciones)
-        else:
-            driver = webdriver.Chrome(options=opciones)
-        
-        print("[*] Abriendo web de Mayflux...")
-        driver.get(URL_LOGIN_MAYFLUX)
-        time.sleep(4) 
-        
-        try:
-            campo_user = driver.find_element(By.XPATH, "//input[@type='email' or contains(@name, 'user') or contains(@name, 'email')]")
-            campo_pass = driver.find_element(By.XPATH, "//input[@type='password']")
-            campo_user.send_keys(CORREO_PROVEEDOR)
-            campo_pass.send_keys(CONTRASENA_PROVEEDOR)
-            campo_pass.submit()
-            time.sleep(5) 
-            print("[*] Sesión iniciada en el navegador invisible.")
-        except:
-            print("[?] Omitiendo inicio de sesión (ya activo o no requerido)...")
+        sesion.post(URL_BASE_MAYFLUX, data={'username': CORREO_PROVEEDOR, 'password': CONTRASENA_PROVEEDOR, 'login': 'Login'}, timeout=15)
+    except:
+        pass
 
-        for prod in PRODUCTOS_A_VIGILAR:
-            print(f"[*] Consultando: {prod['nombre']}...")
-            driver.get(prod["url_proveedor"])
+    for prod in PRODUCTOS_A_VIGILAR:
+        try:
+            respuesta = sesion.get(prod["url_proveedor"], timeout=15)
             
-            # Pausa de renderizado indispensable para Nuxt.js
-            time.sleep(5) 
+            if respuesta.status_code != 200:
+                print(f"[!] Acceso denegado a {prod['nombre']} (HTTP {respuesta.status_code})")
+                continue
+
+            texto_html = respuesta.text
             
-            texto_renderizado = driver.page_source.lower()
+            # --- EL TRUCO MAESTRO: EXTRACCIÓN DE METADATOS NUXT ---
+            # Buscamos el script interno donde Nuxt precarga el JSON de la base de datos
+            bloque_nuxt = re.search(r'window\.__NUXT__\s*=\s*(\(.*?\));', texto_html)
+            if not bloque_nuxt:
+                # Respaldo buscando etiquetas script de datos puros
+                bloque_nuxt = re.search(r'<script[^>]*>.*?(?:__NUXT__|"stock").*?</script>', texto_html, re.DOTALL)
             
-            es_agotado = ("stock: 0" in texto_renderizado) or ("producto agotado" in texto_renderizado)
-            es_disponible = ("añadir al carrito" in texto_renderizado) or ("stock:" in texto_renderizado and "stock: 0" not in texto_renderizado)
-            
-            if es_agotado:
+            # Consolidamos el área de búsqueda: si encontramos el JSON interno, buscamos ahí.
+            # De lo contrario, escaneamos todo el documento plano.
+            area_busqueda = bloque_nuxt.group(0).lower() if bloque_nuxt else texto_html.lower()
+
+            # --- REGLAS DE DETECCIÓN INFALIBLES ---
+            patrones_agotado = ['"stock":0', '"stock": 0', 'stock: 0', '"quantity":0', '"outofstock"', 'producto agotado']
+            patrones_disponible = ['"stock":', 'stock:', 'añadir al carrito', 'add to cart']
+
+            if any(p in area_busqueda for p in patrones_agotado):
                 hay_stock = False
-            elif es_disponible:
+            elif any(p in area_busqueda for p in patrones_disponible):
+                # Validamos que exista la variable de stock pero no esté en cero
                 hay_stock = True
             else:
-                print(f"[?] Estado ambiguo. Protegiendo catálogo con etiqueta (OFF).")
+                print(f"[?] Metadatos incompletos para {prod['nombre']}. Protegiendo con etiqueta (OFF).")
                 hay_stock = False
-                
+
             actualizar_producto_wexait(prod["id_wexait"], hay_stock, prod["nombre"])
             time.sleep(2)
 
-    except Exception as e:
-        print(f"[!] Error crítico en el navegador invisible: {e}")
-    finally:
-        if driver:
-            driver.quit()
-            print("[*] Navegador cerrado para liberar memoria RAM.")
+        except Exception as e:
+            print(f"[!] Error procesando {prod['nombre']}: {e}")
 
 # ==============================================================================
-# 3. BUCLE DE TIEMPO (AMPLIADO HASTA LAS 4 AM)
+# 3. BUCLE DE TIEMPO (HORARIO EXTENDIDO HASTA LAS 4 AM)
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA (SELENIUM NATIVO BLINDADO) INICIADO")
+    print("🚀 BOT VIGÍA (SCRAPER DE MEMORIA NUXT) INICIADO")
     print("=======================================================")
 
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
         
-        # Activo desde las 8 AM en adelante, O en la madrugada hasta las 4:59 AM
+        # Operativo desde las 8 AM en adelante, O en la madrugada hasta las 4:59 AM
         if ahora.hour >= 8 or ahora.hour <= 4:
             verificar_stock_proveedor()
             print(f"[*] Esperando 30 minutos...")
             time.sleep(1800)
         else:
-            print(f"[{ahora.strftime('%I:%M %p')}] Pausa de mantenimiento (5 AM - 8 AM).")
+            print(f"[{ahora.strftime('%I:%M %p')}] Mantenimiento programado (5 AM - 8 AM).")
             time.sleep(900)
 
 if __name__ == "__main__":
