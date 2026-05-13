@@ -23,6 +23,71 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-sin-espn"
     },
     {
+        id_wexait: 7,
+        nombre: "VIX PREMIUM PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/vix-premium-pantalla-1"
+    },
+    {
+        id_wexait: 10,
+        nombre: "PLEX PREMIUM PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/plex-pantalla-licencia-premium"
+    },
+    {
+        id_wexait: 11,
+        nombre: "UNIVERSAL+ PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/universal-pantalla-con-anuncios-no-sirve-en-roku"
+    },
+    {
+        id_wexait: 12,
+        nombre: "APPLE TV+ PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/apple-tv-pantalla-no-sirve-en-mac-ios"
+    },
+    {
+        id_wexait: 18,
+        nombre: "DISNEY+ PREMIUM PANTALLA - Espn (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-espn"
+    },
+    {
+        id_wexait: 20,
+        nombre: "DEEZER PREMIUM - 1 DISPOSITIVO (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/deezer-premium"
+    },
+    {
+        id_wexait: 21,
+        nombre: "SPOTIFY PREMIUM (13 Días)",
+        url_proveedor: "https://mayflux.com/product/spotify-sin-anuncios-13-14-dias-1"
+    },
+    {
+        id_wexait: 39,
+        nombre: "CAPCUT PRO 1 DISP (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/capcut-pro-1-disp-no-sirve-en-iphone"
+    },
+    {
+        id_wexait: 42,
+        nombre: "AVIRA ANTIVIRUS 5DISP (90 Dias)",
+        url_proveedor: "https://mayflux.com/product/avira-antivirus-5disp-3m"
+    },
+    {
+        id_wexait: 46,
+        nombre: "NORDVPN 1 DISP (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/nordvpn-1-disp"
+    },
+    {
+        id_wexait: 47,
+        nombre: "VPN HMA 1 DISP (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/vpn-hma-1-disp-1"
+    },
+    {
+        id_wexait: 80,
+        nombre: "Emby Completa + Canales (30 dias)",
+        url_proveedor: "https://mayflux.com/product/emby-completa-canales"
+    },
+    {
+        id_wexait: 3,
+        nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
+    },
+    {
         id_wexait: 4,
         nombre: "HBO MAX PANTALLA(30 Dias)",
         url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios-1"
