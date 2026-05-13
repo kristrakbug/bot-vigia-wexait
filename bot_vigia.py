@@ -45,22 +45,20 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 2. MOTOR DE SCRAPING DE MEMORIA NUXT (SIN NAVEGADOR)
+# 2. MOTOR DE SCRAPING DE MEMORIA NUXT (SIN SELENIUM)
 # ==============================================================================
 def verificar_stock_proveedor():
     print("\n[+] Extrayendo memoria de estado (Nuxt JSON) desde Mayflux...")
     sesion = requests.Session()
     
-    # Inyectamos cabeceras estrictas de navegador para evitar bloqueos de firewall
     sesion.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.9',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1'
     })
 
-    # Opcional: Intento rápido de login silencioso
     try:
         sesion.post(URL_BASE_MAYFLUX, data={'username': CORREO_PROVEEDOR, 'password': CONTRASENA_PROVEEDOR, 'login': 'Login'}, timeout=15)
     except:
@@ -76,25 +74,19 @@ def verificar_stock_proveedor():
 
             texto_html = respuesta.text
             
-            # --- EL TRUCO MAESTRO: EXTRACCIÓN DE METADATOS NUXT ---
-            # Buscamos el script interno donde Nuxt precarga el JSON de la base de datos
+            # --- BÚSQUEDA DIRECTA EN EL CÓDIGO FUENTE DE NUXT ---
             bloque_nuxt = re.search(r'window\.__NUXT__\s*=\s*(\(.*?\));', texto_html)
             if not bloque_nuxt:
-                # Respaldo buscando etiquetas script de datos puros
                 bloque_nuxt = re.search(r'<script[^>]*>.*?(?:__NUXT__|"stock").*?</script>', texto_html, re.DOTALL)
             
-            # Consolidamos el área de búsqueda: si encontramos el JSON interno, buscamos ahí.
-            # De lo contrario, escaneamos todo el documento plano.
             area_busqueda = bloque_nuxt.group(0).lower() if bloque_nuxt else texto_html.lower()
 
-            # --- REGLAS DE DETECCIÓN INFALIBLES ---
             patrones_agotado = ['"stock":0', '"stock": 0', 'stock: 0', '"quantity":0', '"outofstock"', 'producto agotado']
             patrones_disponible = ['"stock":', 'stock:', 'añadir al carrito', 'add to cart']
 
             if any(p in area_busqueda for p in patrones_agotado):
                 hay_stock = False
             elif any(p in area_busqueda for p in patrones_disponible):
-                # Validamos que exista la variable de stock pero no esté en cero
                 hay_stock = True
             else:
                 print(f"[?] Metadatos incompletos para {prod['nombre']}. Protegiendo con etiqueta (OFF).")
@@ -117,7 +109,6 @@ def iniciar_vigilancia():
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
         
-        # Operativo desde las 8 AM en adelante, O en la madrugada hasta las 4:59 AM
         if ahora.hour >= 8 or ahora.hour <= 4:
             verificar_stock_proveedor()
             print(f"[*] Esperando 30 minutos...")
