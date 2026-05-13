@@ -2,10 +2,12 @@ import time
 import requests
 from datetime import datetime
 import pytz
+import shutil
 
 # Librerías de Selenium
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
 # ==============================================================================
@@ -15,7 +17,7 @@ URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto"
 TOKEN_SECRETO = "WexaitBot2026_Admin"
 ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 
-URL_LOGIN_MAYFLUX = "https://mayflux.com/my-account/" 
+URL_LOGIN_MAYFLUX = "https://mayflux.com" 
 CORREO_PROVEEDOR = "Univedson1@gmail.com"        
 CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"  # <-- RECUERDA PONER TU CLAVE REAL
 
@@ -49,7 +51,7 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 2. MOTOR DE SCRAPING CON NAVEGADOR NATIVO (RAILWAY NIXPACKS)
+# 2. MOTOR DE SCRAPING CON RUTAS NATIVAS FORZADAS
 # ==============================================================================
 def verificar_stock_proveedor():
     print("\n[+] Iniciando Chromium nativo en el servidor para leer Mayflux...")
@@ -62,10 +64,24 @@ def verificar_stock_proveedor():
     opciones.add_argument("--window-size=1920,1080")
     opciones.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 
+    # --- EL TRUCO MAESTRO ---
+    # Buscamos las rutas exactas del binario que instaló nixpacks en el sistema operativo
+    ruta_chromium = shutil.which("chromium") or shutil.which("chromium-browser")
+    ruta_chromedriver = shutil.which("chromedriver")
+
+    if ruta_chromium:
+        opciones.binary_location = ruta_chromium
+        print(f"[*] Binario de Chromium detectado en: {ruta_chromium}")
+
     driver = None
     try:
-        # Al instalar Chromium vía nixpacks, Selenium lo detecta de forma nativa
-        driver = webdriver.Chrome(options=opciones)
+        # Le pasamos explícitamente el Servicio nativo para bloquear la descarga automática
+        if ruta_chromedriver:
+            print(f"[*] Driver nativo detectado en: {ruta_chromedriver}")
+            servicio = Service(executable_path=ruta_chromedriver)
+            driver = webdriver.Chrome(service=servicio, options=opciones)
+        else:
+            driver = webdriver.Chrome(options=opciones)
         
         print("[*] Abriendo web de Mayflux...")
         driver.get(URL_LOGIN_MAYFLUX)
@@ -117,7 +133,7 @@ def verificar_stock_proveedor():
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA (SELENIUM NATIVO) INICIADO")
+    print("🚀 BOT VIGÍA (RUTAS NATIVAS FORZADAS) INICIADO")
     print("=======================================================")
 
     while True:
