@@ -16,8 +16,8 @@ ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 # 2. CONFIGURACIÓN DEL PROVEEDOR (MAYFLUX)
 # ==============================================================================
 URL_LOGIN_MAYFLUX = "https://mayflux.com/my-account/" 
-CORREO_PROVEEDOR = "tu_correo@gmail.com"        # <-- PON TU CORREO DE MAYFLUX
-CONTRASENA_PROVEEDOR = "tu_contrasena_aqui"     # <-- PON TU CONTRASEÑA DE MAYFLUX
+CORREO_PROVEEDOR = "Univedson1@gmail.com"        # <-- PON TU CORREO DE MAYFLUX
+CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"     # <-- PON TU CONTRASEÑA DE MAYFLUX
 
 # --- LISTA MAESTRA DE PRODUCTOS ---
 PRODUCTOS_A_VIGILAR = [
