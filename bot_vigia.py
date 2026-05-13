@@ -1,6 +1,5 @@
 import time
 import requests
-from bs4 import BeautifulSoup
 from datetime import datetime
 import pytz
 
@@ -16,7 +15,7 @@ ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 # ==============================================================================
 URL_LOGIN_MAYFLUX = "https://mayflux.com" 
 CORREO_PROVEEDOR = "Univedson1@gmail.com"        # <-- TU CORREO REAL
-CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"     # <-- TU CONTRASEÑA REAL
+CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"  # <-- PON TU CONTRASEÑA REAL (Ojo, no pongas el correo de nuevo)
 
 PRODUCTOS_A_VIGILAR = [
     {
@@ -45,13 +44,13 @@ def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
     try:
         res = requests.post(URL_WEXAIT, data=payload, timeout=15)
         if res.status_code == 200:
-            accion = "🟢 DISPONIBLE" if estado == 1 else "🔴 AGOTADO (off)"
+            accion = "🟢 DISPONIBLE" if estado == 1 else "🔴 AGOTADO (OFF)"
             print(f"[*] Wexait sincronizado: {nombre_referencia} -> {accion}")
     except:
         print(f"[!] Error de conexión con Wexait")
 
 # ==============================================================================
-# 4. EL MOTOR DE LECTURA (SCRAPER BASADO EN TU CAPTURA)
+# 4. EL MOTOR DE LECTURA (OPTIMIZADO PARA MAYFLUX / NUXT.JS)
 # ==============================================================================
 def verificar_stock_proveedor():
     print("\n[+] Iniciando revisión de inventario en Mayflux...")
@@ -60,7 +59,7 @@ def verificar_stock_proveedor():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     })
 
-    # Iniciar Sesión
+    # Iniciar Sesión en el proveedor
     try:
         sesion.post(URL_LOGIN_MAYFLUX, data={'username': CORREO_PROVEEDOR, 'password': CONTRASENA_PROVEEDOR, 'login': 'Login'}, timeout=15)
     except:
@@ -69,24 +68,14 @@ def verificar_stock_proveedor():
     for prod in PRODUCTOS_A_VIGILAR:
         try:
             respuesta = sesion.get(prod["url_proveedor"], timeout=15)
-            soup = BeautifulSoup(respuesta.text, 'html.parser')
+            texto_bruto = respuesta.text.lower()
             
-            # BUSQUEDA BASADA EN TU INSPECTOR:
-            # 1. Buscamos el botón que tenga el texto de stock
-            texto_pagina = respuesta.text.lower()
-            
-            # Prioridad 1: Si el botón tiene el atributo 'disabled', está agotado fijo.
-            # Según tu captura, el botón de agotado tiene disabled=""
-            boton_desactivado = soup.find('button', attrs={'disabled': True})
-            
-            if "producto agotado" in texto_pagina and boton_desactivado:
+            # --- DETECCIÓN DIRECTA POR TEXTO PURO ---
+            # Ignoramos HTML complejo. Buscamos directamente si la página dice "stock: 0" o "producto agotado".
+            if "stock: 0" in texto_bruto or "producto agotado" in texto_bruto:
                 hay_stock = False
-            elif "añadir al carrito" in texto_pagina:
-                # Verificamos que no sea un botón desactivado
-                hay_stock = True
             else:
-                # Si hay duda, buscamos la frase exacta en el HTML
-                hay_stock = "añadir al carrito" in texto_pagina and "producto agotado" not in texto_pagina
+                hay_stock = True
 
             actualizar_producto_wexait(prod["id_wexait"], hay_stock, prod["nombre"])
             time.sleep(2)
@@ -99,14 +88,20 @@ def verificar_stock_proveedor():
 # ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA PRECISO INICIADO (Horario Colombia)")
+    print("🚀 BOT VIGÍA NUXT-OPTIMIZADO INICIADO (Horario Colombia)")
     print("=======================================================")
 
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
         if 8 <= ahora.hour <= 23:
             verificar_stock_proveedor()
-            print(f"[*] Esperando 30 minutos... (Próxima revisión: {(ahora.hour if ahora.minute < 30 else ahora.hour+1)}:{(ahora.minute+30)%60:02d})")
+            
+            # Cálculo visual de la próxima hora para la consola
+            minuto_actual = ahora.minute
+            hora_proxima = ahora.hour if minuto_actual < 30 else (ahora.hour + 1) % 24
+            minuto_proximo = (minuto_actual + 30) % 60
+            print(f"[*] Esperando 30 minutos... (Próxima revisión aprox: {hora_proxima:02d}:{minuto_proximo:02d})")
+            
             time.sleep(1800)
         else:
             print(f"[{ahora.strftime('%I:%M %p')}] Reposo nocturno.")
