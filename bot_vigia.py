@@ -1,95 +1,138 @@
 import time
 import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 import pytz
 
 # ==============================================================================
-# CONFIGURACIÓN PRINCIPAL
+# 1. CONFIGURACIÓN DE WEXAIT
 # ==============================================================================
 URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto"
 TOKEN_SECRETO = "WexaitBot2026_Admin"
 
-# Zona horaria estricta de Colombia
 ZONA_COLOMBIA = pytz.timezone('America/Bogota')
 
-# Credenciales de Telegram
-TELEGRAM_TOKEN = "7522671094:AAGQUfaRWNG3byCmPFQmxpnYxSkLDKMxFek"
-TELEGRAM_CHAT_ID = "-1003777513176"
+# ==============================================================================
+# 2. CONFIGURACIÓN DEL PROVEEDOR (MAYFLUX)
+# ==============================================================================
+URL_LOGIN_MAYFLUX = "https://mayflux.com/my-account/" 
+CORREO_PROVEEDOR = "tu_correo@gmail.com"        # <-- PON TU CORREO DE MAYFLUX
+CONTRASENA_PROVEEDOR = "tu_contrasena_aqui"     # <-- PON TU CONTRASEÑA DE MAYFLUX
 
-def enviar_alerta_telegram(mensaje):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': mensaje,
-        'parse_mode': 'HTML',
-        'disable_notification': True
+# --- LISTA MAESTRA DE PRODUCTOS ---
+PRODUCTOS_A_VIGILAR = [
+    {
+        "id_wexait": 5,
+        "nombre": "AMAZON PRIME VIDEO PANTALLA (30 Dias)",
+        "url_proveedor": "https://mayflux.com/product/amazon-prime-video-pantalla-1"
+    },
+    {
+        "id_wexait": 19,
+        "nombre": "DISNEY+ Estándar PANTALLA (30 Dias)",
+        "url_proveedor": "https://mayflux.com/product/disney-pantalla-premium-sin-espn"
+    },
+    {
+        "id_wexait": 4,
+        "nombre": "HBO MAX PANTALLA(30 Dias)",
+        "url_proveedor": "https://mayflux.com/product/max-pantalla-sin-anuncios-1"
     }
-    try:
-        requests.post(url, json=payload, timeout=10)
-    except:
-        pass
+]
 
-def actualizar_producto_wexait(producto_id, hay_stock):
+# ==============================================================================
+# 3. FUNCIÓN DE ACTUALIZACIÓN A LA WEB (SILENCIOSA)
+# ==============================================================================
+def actualizar_producto_wexait(producto_id, hay_stock, nombre_referencia):
     estado = 1 if hay_stock else 0
-    payload = {
-        'id': producto_id,
-        'status': estado,
-        'token': TOKEN_SECRETO
-    }
+    payload = {'id': producto_id, 'status': estado, 'token': TOKEN_SECRETO}
     try:
-        respuesta = requests.post(URL_WEXAIT, data=payload, timeout=15)
-        if respuesta.status_code == 200:
-            datos = respuesta.json()
-            nombre = datos.get('nombre_mostrado', f'ID {producto_id}')
-            accion = "🟢 ACTIVADO" if estado == 1 else "🔴 AGOTADO (off)"
-            print(f"[*] Wexait actualizado: {nombre} -> {accion}")
+        res = requests.post(URL_WEXAIT, data=payload, timeout=15)
+        if res.status_code == 200:
+            accion = "🟢 DISPONIBLE" if estado == 1 else "🔴 AGOTADO (off)"
+            print(f"[*] Wexait sincronizado: {nombre_referencia} -> {accion}")
         else:
-            print(f"[!] Error en la web. Código: {respuesta.status_code}")
+            print(f"[!] Falló actualización en Wexait para ID {producto_id}. HTTP {res.status_code}")
     except Exception as e:
-        print(f"[!] Error de conexión con Wexait: {e}")
+        print(f"[!] Error conectando a Wexait: {e}")
 
+# ==============================================================================
+# 4. EL MOTOR DE LECTURA (SCRAPER CON SESIÓN)
+# ==============================================================================
 def verificar_stock_proveedor():
-    print("\n[+] Consultando inventario del proveedor...")
+    print("\n[+] Iniciando revisión de inventario en Mayflux...")
     
-    # --------------------------------------------------------------------------
-    # AQUÍ DEBES INTEGRAR LA LÓGICA REAL DE TU PROVEEDOR
-    # Ejemplo de prueba con IDs simulados:
-    # --------------------------------------------------------------------------
-    crunchyroll_disponible = True   # Simula que hay stock para el ID 5
-    paramount_disponible = False    # Simula que está agotado para el ID 6
-    
-    actualizar_producto_wexait(producto_id=5, hay_stock=crunchyroll_disponible)
-    actualizar_producto_wexait(producto_id=6, hay_stock=paramount_disponible)
+    # Creamos la sesión para mantener las cookies de inicio de sesión
+    sesion = requests.Session()
+    sesion.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
 
+    # 1. INICIAR SESIÓN EN EL PROVEEDOR
+    datos_login = {
+        'username': CORREO_PROVEEDOR,
+        'password': CONTRASENA_PROVEEDOR,
+        'login': 'Login'
+    }
+    
+    try:
+        sesion.post(URL_LOGIN_MAYFLUX, data=datos_login, timeout=15)
+    except Exception as e:
+        print(f"[!] Advertencia al iniciar sesión en Mayflux: {e}")
+
+    # 2. RECORRER CADA PRODUCTO DE LA LISTA
+    for prod in PRODUCTOS_A_VIGILAR:
+        id_wexait = prod["id_wexait"]
+        url_prov = prod["url_proveedor"]
+        nombre = prod["nombre"]
+        
+        try:
+            respuesta = sesion.get(url_prov, timeout=15)
+            texto_html = respuesta.text.lower()
+            
+            # --- LÓGICA DE DETECCIÓN INTELIGENTE ---
+            if "producto agotado" in texto_html:
+                hay_stock = False
+            elif "añadir al carrito" in texto_html:
+                hay_stock = True
+            else:
+                # Respaldo buscando las clases nativas de WooCommerce
+                soup = BeautifulSoup(respuesta.text, 'html.parser')
+                if soup.find(class_="out-of-stock"):
+                    hay_stock = False
+                else:
+                    hay_stock = True
+            
+            # Enviamos la orden directa a tu página web
+            actualizar_producto_wexait(id_wexait, hay_stock, nombre)
+            
+            # Pausa de 2 segundos entre cada producto para cuidar la conexión
+            time.sleep(2)
+            
+        except Exception as e:
+            print(f"[!] Error al leer el producto {nombre} en Mayflux: {e}")
+
+# ==============================================================================
+# 5. EL BUCLE INTERNO DE TIEMPO
+# ==============================================================================
 def iniciar_vigilancia():
     print("=======================================================")
-    print("🚀 BOT VIGÍA INICIADO (Horario Colombia)")
+    print("🚀 BOT VIGÍA SILENCIOSO INICIADO (Horario Colombia)")
     print("=======================================================")
-    enviar_alerta_telegram("🟢 <b>Bot Vigía:</b> Iniciando ciclo de monitoreo.")
 
     while True:
         ahora = datetime.now(ZONA_COLOMBIA)
         hora = ahora.hour
-        minuto = ahora.minute
         hora_str = ahora.strftime('%I:%M %p')
 
-        # Horario activo: 8:00 AM a 11:59 PM
+        # Trabaja estrictamente entre las 8:00 AM y las 11:59 PM
         if 8 <= hora <= 23:
-            print(f"\n[{hora_str} COP] Horario activo. Verificando stock...")
-            try:
-                verificar_stock_proveedor()
-            except Exception as e:
-                print(f"[!] Error en verificación: {e}")
+            print(f"\n[{hora_str} COP] Verificando inventario...")
+            verificar_stock_proveedor()
             
-            print("[*] Esperando 30 minutos...")
-            time.sleep(1800)
+            print("[*] Ciclo terminado. Esperando 30 minutos...")
+            time.sleep(1800) # Duerme 30 minutos
         else:
-            # Horario inactivo: 12:00 AM a 7:59 AM
-            if hora == 0 and minuto < 15:
-                enviar_alerta_telegram("🌙 <b>Bot Vigía:</b> Modo reposo hasta las 8:00 AM.")
-            
-            print(f"[{hora_str} COP] Fuera de horario comercial. Durmiendo...")
-            time.sleep(900) # Revisa la hora cada 15 minutos en la madrugada
+            print(f"[{hora_str} COP] Madrugada en Colombia. Bot en reposo.")
+            time.sleep(900) # En la madrugada solo revisa la hora cada 15 minutos
 
 if __name__ == "__main__":
     iniciar_vigilancia()
