@@ -224,8 +224,8 @@ async function iniciarVigilancia() {
         // Desde las 0 (12:00 AM) hasta las 7 (7:59 AM) entrará al descanso automáticamente.
         if (horaActual >= 8) {
             await verificarStockProveedor();
-            console.log("[*] Misión terminada. Esperando 30 minutos para el siguiente escaneo...");
-            await new Promise(r => setTimeout(r, 1800000)); // 30 minutos
+            console.log("[*] Misión terminada. Esperando 45 minutos para el siguiente escaneo...");
+            await new Promise(r => setTimeout(r, 2700000)); // 45 minutos
         } else {
             console.log("[Noche COP] Horario inactivo. Bot en reposo nocturno (12 AM - 8 AM).");
             await new Promise(r => setTimeout(r, 900000)); // Espera bloques de 15 min hasta las 8 AM
