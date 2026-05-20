@@ -78,11 +78,6 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/vpn-hma-1-disp-1"
     },
     {
-        id_wexait: 80,
-        nombre: "Emby Completa + Canales (30 dias)",
-        url_proveedor: "https://mayflux.com/product/emby-completa-canales"
-    },
-    {
         id_wexait: 3,
         nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
