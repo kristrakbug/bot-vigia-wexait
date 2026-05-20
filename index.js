@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 
 // ==============================================================================
-// 1. CONFIGURACIÓN PRINCIPAL
+// 1. CONFIGURACIÓN PRINCIPAL Y MEMORIA
 // ==============================================================================
 const URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto";
 const TOKEN_SECRETO = "WexaitBot2026_Admin";
@@ -10,6 +10,9 @@ const TOKEN_SECRETO = "WexaitBot2026_Admin";
 const URL_LOGIN_MAYFLUX = "https://mayflux.com/login";
 const CORREO_PROVEEDOR = "Univedson1@gmail.com";
 const CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"; // <-- RECUERDA PONER TU CLAVE REAL
+
+// Memoria global para guardar los strikes de protección entre cada escaneo
+const MEMORIA_VIGILANTE = {};
 
 const PRODUCTOS_A_VIGILAR = [
     {
@@ -115,7 +118,6 @@ async function verificarStockProveedor() {
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
     let browser;
     try {
-        // Lanzamos el navegador virtual
         browser = await puppeteer.launch({
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
@@ -152,56 +154,93 @@ async function verificarStockProveedor() {
                 await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 40000 });
                 console.log("✅ Producto cargado.");
                 
-                // Pausa de seguridad de 3 segundos
                 await new Promise(r => setTimeout(r, 3000));
 
-                // 🕵️‍♂️ VERIFICAR SI ESTÁ AGOTADO (LÓGICA ORIGINAL + DOBLE REVISIÓN DE STOCK)
-                const estadoProducto = await page.evaluate(() => {
+                // 🕵️‍♂️ VERIFICAR ESTADO Y DÍAS EN PANTALLA
+                const resultadoScraping = await page.evaluate(() => {
                     const btns = Array.from(document.querySelectorAll('button'));
                     const btnCarrito = btns.find(b => b.innerText.toLowerCase().includes('añadir al carrito'));
                     const textoPagina = document.body.innerText.toLowerCase();
 
                     let estado = 'disponible';
 
-                    // Tu regla original
+                    // Regla original
                     if (!btnCarrito || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
                         estado = 'agotado';
                     }
 
-                    // NUEVA REGLA: 2da revisión si salió 'agotado'
+                    // 2da revisión de stock
                     if (estado === 'agotado') {
-                        // Buscamos si en la página dice "stock X" o "stock: X"
-                        // La expresión regular busca la palabra stock, espacios opcionales, dos puntos opcionales y captura el número
                         const matchStock = textoPagina.match(/stock\s*:?\s*(\d+)/);
-                        
                         if (matchStock) {
                             const numeroStock = parseInt(matchStock[1], 10);
-                            // Si el número encontrado es mayor a cero, es un falso positivo. Hay stock.
                             if (numeroStock > 0) {
                                 estado = 'disponible';
                             }
                         }
                     }
 
-                    return estado;
+                    // LECTOR DE TIEMPO (DÍAS) PARA EL ESCUDO
+                    let diasDetectados = null;
+                    // Intenta buscar el número de días justo antes de la palabra "stock"
+                    const matchDiasCercaStock = textoPagina.match(/(\d+)\s*d[íi]as?[\s\S]{0,30}?stock/i);
+                    if (matchDiasCercaStock) {
+                        diasDetectados = parseInt(matchDiasCercaStock[1], 10);
+                    } else {
+                        // Respaldo: el primer número de días que aparezca
+                        const matchDiasGeneral = textoPagina.match(/(\d+)\s*d[íi]as?/i);
+                        if (matchDiasGeneral) {
+                            diasDetectados = parseInt(matchDiasGeneral[1], 10);
+                        }
+                    }
+
+                    return { estado, diasDetectados };
                 });
 
-                const hayStock = (estadoProducto === 'disponible');
-                
-                if (!hayStock) {
+                let hayStock = (resultadoScraping.estado === 'disponible');
+
+                // ============================================================
+                // 🛡️ SISTEMA DE PROTECCIÓN DE MARGEN (STRIKES)
+                // ============================================================
+                // Extraemos cuántos días esperas tú (del nombre de tu producto)
+                const matchEsperados = prod.nombre.match(/(\d+)\s*d[íi]as?/i);
+                const diasEsperados = matchEsperados ? parseInt(matchEsperados[1], 10) : null;
+
+                // Preparamos la memoria del bot para este producto
+                if (!MEMORIA_VIGILANTE[prod.id_wexait]) MEMORIA_VIGILANTE[prod.id_wexait] = { strikes: 0 };
+                const memoria = MEMORIA_VIGILANTE[prod.id_wexait];
+
+                if (hayStock && resultadoScraping.diasDetectados && diasEsperados) {
+                    // Si el proveedor subió los días (ej. de 30 a 60, lo que significa más caro)
+                    if (resultadoScraping.diasDetectados > diasEsperados) {
+                        memoria.strikes++;
+                        if (memoria.strikes >= 2) {
+                            hayStock = false; // Activamos el escudo, lo forzamos a apagado
+                            console.log(`🛡️ ESCUDO ACTIVADO: La web dice ${resultadoScraping.diasDetectados} días (Tú esperas: ${diasEsperados}). Forzando a AGOTADO para proteger margen.`);
+                        } else {
+                            console.log(`⚠️ ALERTA: Posible cambio a ${resultadoScraping.diasDetectados} días. Strike ${memoria.strikes}/2.`);
+                        }
+                    } else {
+                        memoria.strikes = 0; // Todo normal, borramos strikes
+                    }
+                } else if (!hayStock) {
+                    memoria.strikes = 0; // Si se agotó naturalmente, reseteamos memoria
+                }
+                // ============================================================
+
+                if (!hayStock && memoria.strikes < 2) {
                     console.log("⚠️ Producto detectado como AGOTADO en Mayflux.");
-                } else {
+                } else if (hayStock) {
                     console.log("🛒 Producto con stock disponible.");
                 }
 
-                // Disparamos la actualización silenciosa a tu web
+                // Disparamos la actualización a tu web
                 await actualizarProductoWexait(prod.id_wexait, hayStock, prod.nombre);
 
             } catch (error) {
                 console.log(`[!] Error al inspeccionar ${prod.nombre}: ${error.message}`);
             }
             
-            // Pausa breve antes de abrir la siguiente pestaña
             await new Promise(r => setTimeout(r, 2000));
         }
 
@@ -216,7 +255,7 @@ async function verificarStockProveedor() {
 }
 
 // ==============================================================================
-// 3. BUCLE DE TIEMPO (HORARIO NORMAL DEFINITIVO: 8 AM - 12 AM)
+// 3. BUCLE DE TIEMPO 
 // ==============================================================================
 function obtenerHoraColombia() {
     const ahora = new Date();
@@ -227,24 +266,21 @@ function obtenerHoraColombia() {
 
 async function iniciarVigilancia() {
     console.log("=======================================================");
-    console.log("🚀 BOT VIGÍA MODO PRODUCCIÓN REAL (Horario Normal) INICIADO");
+    console.log("🚀 BOT VIGÍA (CON ESCUDO DE PROTECCIÓN) INICIADO");
     console.log("=======================================================");
 
     while (true) {
         const horaActual = obtenerHoraColombia();
         
-        // ⏰ Horario Normal: Activo estrictamente si la hora es >= 8 (de 8:00 AM a 11:59 PM)
-        // Desde las 0 (12:00 AM) hasta las 7 (7:59 AM) entrará al descanso automáticamente.
         if (horaActual >= 8) {
             await verificarStockProveedor();
             console.log("[*] Misión terminada. Esperando 45 minutos para el siguiente escaneo...");
             await new Promise(r => setTimeout(r, 2700000)); // 45 minutos
         } else {
             console.log("[Noche COP] Horario inactivo. Bot en reposo nocturno (12 AM - 8 AM).");
-            await new Promise(r => setTimeout(r, 900000)); // Espera bloques de 15 min hasta las 8 AM
+            await new Promise(r => setTimeout(r, 900000)); 
         }
     }
 }
 
-// Arrancamos el motor
 iniciarVigilancia();
