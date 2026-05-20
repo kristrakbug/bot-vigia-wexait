@@ -114,7 +114,7 @@ async function actualizarProductoWexait(producto_id, hay_stock, nombre_referenci
 }
 
 // ==============================================================================
-// 2. MOTOR DE SCRAPING
+// 2. MOTOR DE SCRAPING 
 // ==============================================================================
 async function verificarStockProveedor() {
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
@@ -160,28 +160,35 @@ async function verificarStockProveedor() {
                 // Pausa de seguridad de 3 segundos
                 await new Promise(r => setTimeout(r, 3000));
 
-                // 🕵️‍♂️ VERIFICAR SI ESTÁ AGOTADO (LÓGICA MEJORADA PARA VARIACIONES)
+                // 🕵️‍♂️ VERIFICAR SI ESTÁ AGOTADO (LÓGICA ORIGINAL + DOBLE REVISIÓN DE STOCK)
                 const estadoProducto = await page.evaluate(() => {
-                    // Buscamos todos los botones
                     const btns = Array.from(document.querySelectorAll('button'));
-                    // Filtramos el que sea de añadir al carrito
                     const btnCarrito = btns.find(b => b.innerText.toLowerCase().includes('añadir al carrito'));
+                    const textoPagina = document.body.innerText.toLowerCase();
 
-                    // 1. Si el botón NO existe en toda la página, está agotado
-                    if (!btnCarrito) {
-                        return 'agotado';
+                    let estado = 'disponible';
+
+                    // Tu regla original
+                    if (!btnCarrito || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
+                        estado = 'agotado';
                     }
 
-                    // 2. Si el botón SÍ EXISTE, verificamos que no esté bloqueado. 
-                    // En productos con variaciones agotadas, el botón sigue ahí pero no se puede clickear.
-                    if (btnCarrito.disabled || 
-                        btnCarrito.getAttribute('aria-disabled') === 'true' || 
-                        btnCarrito.className.toLowerCase().includes('disabled')) {
-                        return 'agotado';
+                    // NUEVA REGLA: 2da revisión si salió 'agotado'
+                    if (estado === 'agotado') {
+                        // Buscamos si en la página dice "stock X" o "stock: X"
+                        // La expresión regular busca la palabra stock, espacios opcionales, dos puntos opcionales y captura el número
+                        const matchStock = textoPagina.match(/stock\s*:?\s*(\d+)/);
+                        
+                        if (matchStock) {
+                            const numeroStock = parseInt(matchStock[1], 10);
+                            // Si el número encontrado es mayor a cero, es un falso positivo. Hay stock.
+                            if (numeroStock > 0) {
+                                estado = 'disponible';
+                            }
+                        }
                     }
 
-                    // 3. Si el botón está presente y no está deshabilitado, es seguro que hay stock.
-                    return 'disponible';
+                    return estado;
                 });
 
                 const hayStock = (estadoProducto === 'disponible');
