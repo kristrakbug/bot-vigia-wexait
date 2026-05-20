@@ -114,13 +114,13 @@ async function actualizarProductoWexait(producto_id, hay_stock, nombre_referenci
 }
 
 // ==============================================================================
-// 2. MOTOR DE SCRAPING (CLONADO DE TU LÓGICA DE COMPRAS)
+// 2. MOTOR DE SCRAPING
 // ==============================================================================
 async function verificarStockProveedor() {
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
     let browser;
     try {
-        // Lanzamos el navegador virtual de forma idéntica a tu bot de entregas
+        // Lanzamos el navegador virtual
         browser = await puppeteer.launch({
             headless: "new",
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
@@ -129,7 +129,7 @@ async function verificarStockProveedor() {
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
-        // --- 1. LOGIN (Opcional para asegurar carga visual) ---
+        // --- 1. LOGIN ---
         try {
             console.log("[*] Entrando a Mayflux...");
             await page.goto(URL_LOGIN_MAYFLUX, { waitUntil: 'networkidle2', timeout: 30000 });
@@ -157,19 +157,30 @@ async function verificarStockProveedor() {
                 await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 40000 });
                 console.log("✅ Producto cargado.");
                 
-                // Pausa de seguridad de 3 segundos para que Vue/Nuxt termine de procesar el JavaScript visual
+                // Pausa de seguridad de 3 segundos
                 await new Promise(r => setTimeout(r, 3000));
 
-                // 🕵️‍♂️ VERIFICAR SI ESTÁ AGOTADO (Usando tu lógica exacta clonada)
+                // 🕵️‍♂️ VERIFICAR SI ESTÁ AGOTADO (LÓGICA MEJORADA PARA VARIACIONES)
                 const estadoProducto = await page.evaluate(() => {
+                    // Buscamos todos los botones
                     const btns = Array.from(document.querySelectorAll('button'));
+                    // Filtramos el que sea de añadir al carrito
                     const btnCarrito = btns.find(b => b.innerText.toLowerCase().includes('añadir al carrito'));
-                    const textoPagina = document.body.innerText.toLowerCase();
 
-                    // Mismas reglas estrictas de tu bot de compras
-                    if (!btnCarrito || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
+                    // 1. Si el botón NO existe en toda la página, está agotado
+                    if (!btnCarrito) {
                         return 'agotado';
                     }
+
+                    // 2. Si el botón SÍ EXISTE, verificamos que no esté bloqueado. 
+                    // En productos con variaciones agotadas, el botón sigue ahí pero no se puede clickear.
+                    if (btnCarrito.disabled || 
+                        btnCarrito.getAttribute('aria-disabled') === 'true' || 
+                        btnCarrito.className.toLowerCase().includes('disabled')) {
+                        return 'agotado';
+                    }
+
+                    // 3. Si el botón está presente y no está deshabilitado, es seguro que hay stock.
                     return 'disponible';
                 });
 
