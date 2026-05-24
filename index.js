@@ -154,40 +154,58 @@ async function verificarStockProveedor() {
                 await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 40000 });
                 console.log("✅ Producto cargado.");
                 
-                await new Promise(r => setTimeout(r, 3000));
+                // 🔥 5 SEGUNDOS DE ESPERA PARA CARGA DE STOCK 🔥
+                await new Promise(r => setTimeout(r, 5000));
 
                 // 🕵️‍♂️ VERIFICAR ESTADO Y DÍAS EN PANTALLA
                 const resultadoScraping = await page.evaluate(() => {
                     const btns = Array.from(document.querySelectorAll('button'));
-                    const btnCarrito = btns.find(b => b.innerText.toLowerCase().includes('añadir al carrito'));
+                    const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('añadir al carrito'));
                     const textoPagina = document.body.innerText.toLowerCase();
 
                     let estado = 'disponible';
+                    let isBtnDisabled = false;
+
+                    if (btnCarrito) {
+                        isBtnDisabled = btnCarrito.disabled;
+                    }
 
                     // Regla original
-                    if (!btnCarrito || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
+                    if (!btnCarrito || isBtnDisabled || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
                         estado = 'agotado';
                     }
 
-                    // 2da revisión de stock
-                    if (estado === 'agotado') {
-                        const matchStock = textoPagina.match(/stock\s*:?\s*(\d+)/);
-                        if (matchStock) {
-                            const numeroStock = parseInt(matchStock[1], 10);
-                            if (numeroStock > 0) {
-                                estado = 'disponible';
-                            }
+                    // 🚑 OPERACIÓN RESCATE MEJORADA (Búsqueda exacta de etiqueta <span>)
+                    const spans = Array.from(document.querySelectorAll('span'));
+                    const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock:'));
+                    
+                    let numeroStock = 0;
+                    
+                    if (spanStock) {
+                        // Extrae el número del texto (ej: "Stock: 31" -> 31)
+                        const match = spanStock.innerText.match(/\d+/);
+                        if (match) {
+                            numeroStock = parseInt(match[0], 10);
                         }
+                    } else {
+                        // Respaldo por si le quitan el span
+                        const matchStockTexto = textoPagina.match(/stock\s*[:\n-]?\s*(\d+)/i);
+                        if (matchStockTexto) {
+                            numeroStock = parseInt(matchStockTexto[1], 10);
+                        }
+                    }
+
+                    // Si hay número de stock real y el botón sirve, cancelamos la alarma
+                    if (numeroStock > 0 && btnCarrito && !isBtnDisabled) {
+                        estado = 'disponible';
                     }
 
                     // LECTOR DE TIEMPO (DÍAS) PARA EL ESCUDO
                     let diasDetectados = null;
-                    // Intenta buscar el número de días justo antes de la palabra "stock"
                     const matchDiasCercaStock = textoPagina.match(/(\d+)\s*d[íi]as?[\s\S]{0,30}?stock/i);
                     if (matchDiasCercaStock) {
                         diasDetectados = parseInt(matchDiasCercaStock[1], 10);
                     } else {
-                        // Respaldo: el primer número de días que aparezca
                         const matchDiasGeneral = textoPagina.match(/(\d+)\s*d[íi]as?/i);
                         if (matchDiasGeneral) {
                             diasDetectados = parseInt(matchDiasGeneral[1], 10);
@@ -202,29 +220,26 @@ async function verificarStockProveedor() {
                 // ============================================================
                 // 🛡️ SISTEMA DE PROTECCIÓN DE MARGEN (STRIKES)
                 // ============================================================
-                // Extraemos cuántos días esperas tú (del nombre de tu producto)
                 const matchEsperados = prod.nombre.match(/(\d+)\s*d[íi]as?/i);
                 const diasEsperados = matchEsperados ? parseInt(matchEsperados[1], 10) : null;
 
-                // Preparamos la memoria del bot para este producto
                 if (!MEMORIA_VIGILANTE[prod.id_wexait]) MEMORIA_VIGILANTE[prod.id_wexait] = { strikes: 0 };
                 const memoria = MEMORIA_VIGILANTE[prod.id_wexait];
 
                 if (hayStock && resultadoScraping.diasDetectados && diasEsperados) {
-                    // Si el proveedor subió los días (ej. de 30 a 60, lo que significa más caro)
                     if (resultadoScraping.diasDetectados > diasEsperados) {
                         memoria.strikes++;
                         if (memoria.strikes >= 2) {
-                            hayStock = false; // Activamos el escudo, lo forzamos a apagado
+                            hayStock = false; 
                             console.log(`🛡️ ESCUDO ACTIVADO: La web dice ${resultadoScraping.diasDetectados} días (Tú esperas: ${diasEsperados}). Forzando a AGOTADO para proteger margen.`);
                         } else {
                             console.log(`⚠️ ALERTA: Posible cambio a ${resultadoScraping.diasDetectados} días. Strike ${memoria.strikes}/2.`);
                         }
                     } else {
-                        memoria.strikes = 0; // Todo normal, borramos strikes
+                        memoria.strikes = 0; 
                     }
                 } else if (!hayStock) {
-                    memoria.strikes = 0; // Si se agotó naturalmente, reseteamos memoria
+                    memoria.strikes = 0; 
                 }
                 // ============================================================
 
