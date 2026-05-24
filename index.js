@@ -63,7 +63,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 39,
         nombre: "CAPCUT PRO 1 DISP (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/capcut-pro-1-disp-no-sirve-en-iphone"
+        url_proveedor: "https://mayflux.com/product/capcut-pro-1-disp"
     },
     {
         id_wexait: 42,
