@@ -66,21 +66,6 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/capcut-pro-1-disp"
     },
     {
-        id_wexait: 42,
-        nombre: "AVIRA ANTIVIRUS 5DISP (90 Dias)",
-        url_proveedor: "https://mayflux.com/product/avira-antivirus-5disp-3m"
-    },
-    {
-        id_wexait: 46,
-        nombre: "NORDVPN 1 DISP (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/nordvpn-1-disp"
-    },
-    {
-        id_wexait: 47,
-        nombre: "VPN HMA 1 DISP (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/vpn-hma-1-disp-1"
-    },
-    {
         id_wexait: 3,
         nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
