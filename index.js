@@ -159,63 +159,52 @@ async function verificarStockProveedor() {
 
                 // 🕵️‍♂️ VERIFICAR ESTADO Y DÍAS EN PANTALLA
                 const resultadoScraping = await page.evaluate(() => {
+                    // 1. Buscar el botón de carrito
                     const btns = Array.from(document.querySelectorAll('button'));
-                    const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('añadir al carrito'));
-                    const textoPagina = document.body.innerText.toLowerCase();
-
-                    let estado = 'disponible';
+                    const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('carrito'));
+                    
                     let isBtnDisabled = false;
-
                     if (btnCarrito) {
                         isBtnDisabled = btnCarrito.disabled;
                     }
 
-                    // Regla original
-                    if (!btnCarrito || isBtnDisabled || textoPagina.includes('agotado') || textoPagina.includes('out of stock')) {
-                        estado = 'agotado';
-                    }
-
-                    // 🚑 OPERACIÓN RESCATE MEJORADA (Búsqueda exacta de etiqueta <span>)
+                    // 2. Buscar el Stock DIRECTAMENTE en los spans
                     const spans = Array.from(document.querySelectorAll('span'));
-                    const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock:'));
+                    const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
                     
                     let numeroStock = 0;
-                    
                     if (spanStock) {
-                        // Extrae el número del texto (ej: "Stock: 31" -> 31)
+                        // Limpia el texto y busca números. Ej: "Stock: 31" -> "31"
                         const match = spanStock.innerText.match(/\d+/);
                         if (match) {
                             numeroStock = parseInt(match[0], 10);
                         }
-                    } else {
-                        // Respaldo por si le quitan el span
-                        const matchStockTexto = textoPagina.match(/stock\s*[:\n-]?\s*(\d+)/i);
-                        if (matchStockTexto) {
-                            numeroStock = parseInt(matchStockTexto[1], 10);
-                        }
                     }
 
-                    // Si hay número de stock real y el botón sirve, cancelamos la alarma
-                    if (numeroStock > 0 && btnCarrito && !isBtnDisabled) {
+                    // 3. Tomar decisión
+                    let estado = 'agotado'; // Asumimos agotado por defecto (modo seguro)
+                    
+                    // Si el botón está ahí, NO está deshabilitado y hay más de 0 en stock, lo prendemos
+                    if (btnCarrito && !isBtnDisabled && numeroStock > 0) {
                         estado = 'disponible';
                     }
 
-                    // LECTOR DE TIEMPO (DÍAS) PARA EL ESCUDO
+                    // 4. LECTOR DE TIEMPO (DÍAS) PARA EL ESCUDO
+                    // Buscamos cualquier span que diga "días", "Dias", etc.
                     let diasDetectados = null;
-                    const matchDiasCercaStock = textoPagina.match(/(\d+)\s*d[íi]as?[\s\S]{0,30}?stock/i);
-                    if (matchDiasCercaStock) {
-                        diasDetectados = parseInt(matchDiasCercaStock[1], 10);
-                    } else {
-                        const matchDiasGeneral = textoPagina.match(/(\d+)\s*d[íi]as?/i);
-                        if (matchDiasGeneral) {
-                            diasDetectados = parseInt(matchDiasGeneral[1], 10);
+                    const spanDias = spans.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
+                    if (spanDias) {
+                        const matchDias = spanDias.innerText.match(/(\d+)/);
+                        if (matchDias) {
+                            diasDetectados = parseInt(matchDias[0], 10);
                         }
                     }
 
-                    return { estado, diasDetectados };
+                    return { estado, diasDetectados, stockLeido: numeroStock };
                 });
 
                 let hayStock = (resultadoScraping.estado === 'disponible');
+                console.log(`[🔍] Diagnóstico: Stock leído = ${resultadoScraping.stockLeido}, Días detectados = ${resultadoScraping.diasDetectados}`);
 
                 // ============================================================
                 // 🛡️ SISTEMA DE PROTECCIÓN DE MARGEN (STRIKES)
