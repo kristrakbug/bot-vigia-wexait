@@ -71,6 +71,21 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
     },
     {
+        id_wexait: 83,
+        nombre: "WIN+ PLAY (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp"
+    },
+    {
+        id_wexait: 13,
+        nombre: "MUBI PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/mubi-pantalla"
+    },
+    {
+        id_wexait: 22,
+        nombre: "SPOTIFY PREMIUM - 1 DISPOSITIVO (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/spotify-premium"
+    },
+    {
         id_wexait: 4,
         nombre: "HBO MAX PANTALLA(30 Dias)",
         url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios-1"
