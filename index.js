@@ -92,18 +92,19 @@ const PRODUCTOS_A_VIGILAR = [
     }
 ];
 
-// Función silenciosa para sincronizar el estado en tu base de datos de Laravel
-async function actualizarProductoWexait(producto_id, hay_stock, nombre_referencia) {
+// 🔥 FUNCIÓN MODIFICADA: Ahora recibe y envía 'cantidad_stock' 🔥
+async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, nombre_referencia) {
     const estado_api = hay_stock ? 1 : 0;
     try {
         const params = new URLSearchParams();
         params.append('id', producto_id);
         params.append('status', estado_api);
+        params.append('stock', cantidad_stock); // <-- AQUÍ SE EMPACA EL NÚMERO
         params.append('token', TOKEN_SECRETO);
 
         const res = await axios.post(URL_WEXAIT, params);
         if (res.status === 200) {
-            const accion = hay_stock ? "🟢 DISPONIBLE" : "🔴 AGOTADO (OFF)";
+            const accion = hay_stock ? `🟢 DISPONIBLE (Stock enviado: ${cantidad_stock})` : "🔴 AGOTADO (OFF)";
             console.log(`[*] Wexait sincronizado: ${nombre_referencia} -> ${accion}`);
         }
     } catch (error) {
@@ -123,13 +124,16 @@ async function verificarStockProveedor() {
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         });
         const page = await browser.newPage();
+        
+        await page.setDefaultNavigationTimeout(60000); 
+
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
         // --- 1. LOGIN ---
         try {
             console.log("[*] Entrando a Mayflux...");
-            await page.goto(URL_LOGIN_MAYFLUX, { waitUntil: 'networkidle2', timeout: 30000 });
+            await page.goto(URL_LOGIN_MAYFLUX, { waitUntil: 'networkidle2', timeout: 60000 });
             
             const emailInput = await page.$('input[type="email"]');
             const passInput = await page.$('input[type="password"]');
@@ -139,7 +143,7 @@ async function verificarStockProveedor() {
                 await page.type('input[type="password"]', CONTRASENA_PROVEEDOR);
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {})
                 ]);
                 console.log("✅ Sesión iniciada.");
             }
@@ -151,15 +155,12 @@ async function verificarStockProveedor() {
         for (const prod of PRODUCTOS_A_VIGILAR) {
             console.log(`\n🚀 Iniciando MISIÓN DE VIGILANCIA para: ${prod.nombre}`);
             try {
-                await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 40000 });
+                await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 60000 });
                 console.log("✅ Producto cargado.");
                 
-                // 🔥 5 SEGUNDOS DE ESPERA PARA CARGA DE STOCK 🔥
                 await new Promise(r => setTimeout(r, 5000));
 
-                // 🕵️‍♂️ VERIFICAR ESTADO Y DÍAS EN PANTALLA
                 const resultadoScraping = await page.evaluate(() => {
-                    // 1. Buscar el botón de carrito
                     const btns = Array.from(document.querySelectorAll('button'));
                     const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('carrito'));
                     
@@ -168,29 +169,23 @@ async function verificarStockProveedor() {
                         isBtnDisabled = btnCarrito.disabled;
                     }
 
-                    // 2. Buscar el Stock DIRECTAMENTE en los spans
                     const spans = Array.from(document.querySelectorAll('span'));
                     const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
                     
                     let numeroStock = 0;
                     if (spanStock) {
-                        // Limpia el texto y busca números. Ej: "Stock: 31" -> "31"
                         const match = spanStock.innerText.match(/\d+/);
                         if (match) {
                             numeroStock = parseInt(match[0], 10);
                         }
                     }
 
-                    // 3. Tomar decisión
-                    let estado = 'agotado'; // Asumimos agotado por defecto (modo seguro)
+                    let estado = 'agotado'; 
                     
-                    // Si el botón está ahí, NO está deshabilitado y hay más de 0 en stock, lo prendemos
                     if (btnCarrito && !isBtnDisabled && numeroStock > 0) {
                         estado = 'disponible';
                     }
 
-                    // 4. LECTOR DE TIEMPO (DÍAS) PARA EL ESCUDO
-                    // Buscamos cualquier span que diga "días", "Dias", etc.
                     let diasDetectados = null;
                     const spanDias = spans.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
                     if (spanDias) {
@@ -238,8 +233,8 @@ async function verificarStockProveedor() {
                     console.log("🛒 Producto con stock disponible.");
                 }
 
-                // Disparamos la actualización a tu web
-                await actualizarProductoWexait(prod.id_wexait, hayStock, prod.nombre);
+                // 🔥 LÍNEA MODIFICADA: Le pasamos 'resultadoScraping.stockLeido' a la función 🔥
+                await actualizarProductoWexait(prod.id_wexait, hayStock, resultadoScraping.stockLeido, prod.nombre);
 
             } catch (error) {
                 console.log(`[!] Error al inspeccionar ${prod.nombre}: ${error.message}`);
