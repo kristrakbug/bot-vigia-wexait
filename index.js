@@ -36,6 +36,11 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/plex-pantalla-licencia-premium"
     },
     {
+        id_wexait: 6,
+        nombre: "PARAMOUNT+ PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
+    },
+    {
         id_wexait: 11,
         nombre: "UNIVERSAL+ PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/universal-pantalla-con-anuncios-no-sirve-en-roku"
@@ -83,7 +88,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 22,
         nombre: "SPOTIFY PREMIUM - 1 DISPOSITIVO (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/spotify-premium"
+        url_proveedor: "https://mayflux.com/product/spotify-premium-1"
     },
     {
         id_wexait: 4,
