@@ -123,13 +123,18 @@ async function verificarStockProveedor() {
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         });
         const page = await browser.newPage();
+        
+        // 🔥 CORRECCIÓN: Aumentar el tiempo de espera global a 60 segundos (60000ms)
+        await page.setDefaultNavigationTimeout(60000); 
+
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
         // --- 1. LOGIN ---
         try {
             console.log("[*] Entrando a Mayflux...");
-            await page.goto(URL_LOGIN_MAYFLUX, { waitUntil: 'networkidle2', timeout: 30000 });
+            // 🔥 CORRECCIÓN: Timeout a 60000ms
+            await page.goto(URL_LOGIN_MAYFLUX, { waitUntil: 'networkidle2', timeout: 60000 });
             
             const emailInput = await page.$('input[type="email"]');
             const passInput = await page.$('input[type="password"]');
@@ -139,19 +144,21 @@ async function verificarStockProveedor() {
                 await page.type('input[type="password"]', CONTRASENA_PROVEEDOR);
                 await Promise.all([
                     page.click('button[type="submit"]'),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {})
+                    // 🔥 CORRECCIÓN: Timeout a 60000ms
+                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {})
                 ]);
                 console.log("✅ Sesión iniciada.");
             }
         } catch (err) {
-            console.log("[?] Omitiendo login (interfaz pre-cargada o acceso directo permitido).");
+            console.log(`[?] Omitiendo login o error al entrar: ${err.message}`);
         }
 
         // --- 2. NAVEGAR Y VERIFICAR CADA PRODUCTO ---
         for (const prod of PRODUCTOS_A_VIGILAR) {
             console.log(`\n🚀 Iniciando MISIÓN DE VIGILANCIA para: ${prod.nombre}`);
             try {
-                await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 40000 });
+                // 🔥 CORRECCIÓN: Timeout a 60000ms
+                await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 60000 });
                 console.log("✅ Producto cargado.");
                 
                 // 🔥 5 SEGUNDOS DE ESPERA PARA CARGA DE STOCK 🔥
