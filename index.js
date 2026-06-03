@@ -26,6 +26,11 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-sin-espn"
     },
     {
+        id_wexait: 18,
+        nombre: "DISNEY+ PREMIUM PANTALLA - Espn (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-espn-1"
+    },
+    {
         id_wexait: 7,
         nombre: "VIX PREMIUM PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/vix-premium-pantalla-1"
@@ -49,11 +54,6 @@ const PRODUCTOS_A_VIGILAR = [
         id_wexait: 12,
         nombre: "APPLE TV+ PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/apple-tv-pantalla-no-sirve-en-mac-ios"
-    },
-    {
-        id_wexait: 18,
-        nombre: "DISNEY+ PREMIUM PANTALLA - Espn (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-espn"
     },
     {
         id_wexait: 20,
