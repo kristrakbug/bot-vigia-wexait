@@ -42,8 +42,13 @@ const PRODUCTOS_A_VIGILAR = [
     },
     {
         id_wexait: 6,
-        nombre: "PARAMOUNT+ PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
+        nombre: "PARAMOUNT+ PANTALLA ESTANDAR (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/paramount-plan-standard-pantalla"
+    },
+    {
+        id_wexait: 6,
+        nombre: "PARAMOUNT+ PANTALLA PREMIUM (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium"
     },
     {
         id_wexait: 11,
