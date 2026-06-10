@@ -83,7 +83,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 83,
         nombre: "WIN+ PLAY (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp"
+        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp-1"
     },
     {
         id_wexait: 13,
