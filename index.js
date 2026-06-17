@@ -71,11 +71,6 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/spotify-sin-anuncios-13-14-dias-1"
     },
     {
-        id_wexait: 39,
-        nombre: "CAPCUT PRO 1 DISP (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/capcut-pro-1-disp"
-    },
-    {
         id_wexait: 3,
         nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
@@ -83,7 +78,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 83,
         nombre: "WIN+ PLAY (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp-1"
+        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp"
     },
     {
         id_wexait: 13,
@@ -98,7 +93,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 4,
         nombre: "HBO MAX PANTALLA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios-1"
+        url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios"
     }
 ];
 
