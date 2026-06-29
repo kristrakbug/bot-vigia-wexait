@@ -38,12 +38,12 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 10,
         nombre: "PLEX PREMIUM PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/plex-pantalla-licencia-premium"
+        url_proveedor: "https://mayflux.com/product/plex-pantalla-servidor-y-licencia-premium"
     },
     {
         id_wexait: 6,
         nombre: "PARAMOUNT+ PANTALLA ESTANDAR (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-plan-standard-pantalla-1"
+        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium"
     },
     {
         id_wexait: 84,
@@ -73,7 +73,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 3,
         nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
+        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan-1"
     },
     {
         id_wexait: 83,
