@@ -124,9 +124,18 @@ async function verificarStockProveedor() {
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
     let browser;
     try {
+        // 🔥 CORRECCIÓN DE MEMORIA APLICADA AQUÍ 🔥
         browser = await puppeteer.launch({
             headless: "new",
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox', 
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process'
+            ]
         });
         const page = await browser.newPage();
         
