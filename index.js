@@ -38,7 +38,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 10,
         nombre: "PLEX PREMIUM PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/plex-pantalla-servidor-y-licencia-premium"
+        url_proveedor: "https://mayflux.com/product/plex-pantalla-licencia-premium"
     },
     {
         id_wexait: 6,
