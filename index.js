@@ -73,7 +73,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 3,
         nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan-1"
+        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
     },
     {
         id_wexait: 83,
