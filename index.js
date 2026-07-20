@@ -81,6 +81,26 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp-1"
     },
     {
+        id_wexait: 103,
+        nombre: "IPTV ESTANDAR PANTALLA (30 Dias)",
+        url_proveedor: "https://mayflux.com/product/iptv-pantalla-1"
+    },
+    {
+        id_wexait: 90,
+        nombre: "VIX COMPLETA(30 Dias)",
+        url_proveedor: "https://mayflux.com/product/vix-premium-completa-1"
+    },
+     {
+        id_wexait: 99,
+        nombre: "XUPER TV PANTALLA(30 Dias)",
+        url_proveedor: "https://mayflux.com/product/xuper-tv-pantalla-solo-android-flujo-tv-1"
+    },
+    {
+        id_wexait: 92,
+        nombre: "PLEX PREMIUM COMPLETA(30 Dias)",
+        url_proveedor: "https://mayflux.com/product/plex-completa-licencia-premium"
+    },
+    {
         id_wexait: 13,
         nombre: "MUBI PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/mubi-pantalla"
