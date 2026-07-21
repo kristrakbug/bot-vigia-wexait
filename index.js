@@ -96,11 +96,6 @@ const PRODUCTOS_A_VIGILAR = [
         url_proveedor: "https://mayflux.com/product/xuper-tv-pantalla-solo-android-flujo-tv-1"
     },
     {
-        id_wexait: 92,
-        nombre: "PLEX PREMIUM COMPLETA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/plex-completa-licencia-premium"
-    },
-    {
         id_wexait: 13,
         nombre: "MUBI PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/mubi-pantalla"
