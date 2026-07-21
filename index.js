@@ -108,7 +108,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 22,
         nombre: "SPOTIFY PREMIUM - 1 DISPOSITIVO (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/spotify-premium-1"
+        url_proveedor: "https://mayflux.com/product/spotify-premium"
     },
     {
         id_wexait: 4,
