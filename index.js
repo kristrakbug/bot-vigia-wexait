@@ -43,12 +43,12 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 6,
         nombre: "PARAMOUNT+ PANTALLA ESTANDAR (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium"
+        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
     },
     {
         id_wexait: 84,
         nombre: "PARAMOUNT+ PANTALLA PREMIUM (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium"
+        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
     },
     {
         id_wexait: 11,
@@ -103,7 +103,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 4,
         nombre: "HBO MAX PANTALLA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/max-pantalla-con-anuncios"
+        url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios"
     }
 ];
 
