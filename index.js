@@ -85,11 +85,6 @@ const PRODUCTOS_A_VIGILAR = [
         nombre: "IPTV ESTANDAR PANTALLA (30 Dias)",
         url_proveedor: "https://mayflux.com/product/iptv-pantalla-1"
     },
-    {
-        id_wexait: 90,
-        nombre: "VIX COMPLETA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/vix-premium-completa-1"
-    },
      {
         id_wexait: 99,
         nombre: "XUPER TV PANTALLA(30 Dias)",
