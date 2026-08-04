@@ -103,7 +103,7 @@ const PRODUCTOS_A_VIGILAR = [
     {
         id_wexait: 4,
         nombre: "HBO MAX PANTALLA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios"
+        url_proveedor: "https://mayflux.com/product/max-pantalla-con-anuncios"
     }
 ];
 
