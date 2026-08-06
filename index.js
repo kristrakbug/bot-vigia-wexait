@@ -14,93 +14,21 @@ const CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"; // <-- RECUERDA PONER TU CL
 // Memoria global para guardar los strikes de protección entre cada escaneo
 const MEMORIA_VIGILANTE = {};
 
-const PRODUCTOS_A_VIGILAR = [
-    {
-        id_wexait: 5,
-        nombre: "AMAZON PRIME VIDEO PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/amazon-prime-video-pantalla-1"
-    },
-    {
-        id_wexait: 19,
-        nombre: "DISNEY+ Estándar PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-sin-espn"
-    },
-    {
-        id_wexait: 18,
-        nombre: "DISNEY+ PREMIUM PANTALLA - Espn (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/disney-pantalla-premium-espn-1"
-    },
-    {
-        id_wexait: 7,
-        nombre: "VIX PREMIUM PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/vix-premium-pantalla-1"
-    },
-    {
-        id_wexait: 10,
-        nombre: "PLEX PREMIUM PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/plex-pantalla-licencia-premium"
-    },
-    {
-        id_wexait: 6,
-        nombre: "PARAMOUNT+ PANTALLA ESTANDAR (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
-    },
-    {
-        id_wexait: 84,
-        nombre: "PARAMOUNT+ PANTALLA PREMIUM (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/paramount-pantalla-plan-premium-1"
-    },
-    {
-        id_wexait: 11,
-        nombre: "UNIVERSAL+ PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/universal-pantalla-con-anuncios-no-sirve-en-roku"
-    },
-    {
-        id_wexait: 12,
-        nombre: "APPLE TV+ PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/apple-tv-pantalla-no-sirve-en-mac-ios"
-    },
-    {
-        id_wexait: 20,
-        nombre: "DEEZER PREMIUM - 1 DISPOSITIVO (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/deezer-premium"
-    },
-    {
-        id_wexait: 21,
-        nombre: "SPOTIFY PREMIUM (13 Días)",
-        url_proveedor: "https://mayflux.com/product/spotify-sin-anuncios-13-14-dias-1"
-    },
-    {
-        id_wexait: 3,
-        nombre: "CRUNCHYROLL PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/crunchyroll-pantalla-megafan"
-    },
-    {
-        id_wexait: 83,
-        nombre: "WIN+ PLAY (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/win-solo-colombia-1-disp-1"
-    },
-    {
-        id_wexait: 103,
-        nombre: "IPTV ESTANDAR PANTALLA (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/iptv-pantalla-1"
-    },
-     {
-        id_wexait: 99,
-        nombre: "XUPER TV PANTALLA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/xuper-tv-pantalla-solo-android-flujo-tv-1"
-    },
-    {
-        id_wexait: 22,
-        nombre: "SPOTIFY PREMIUM - 1 DISPOSITIVO (30 Dias)",
-        url_proveedor: "https://mayflux.com/product/spotify-premium"
-    },
-    {
-        id_wexait: 4,
-        nombre: "HBO MAX PANTALLA(30 Dias)",
-        url_proveedor: "https://mayflux.com/product/max-pantalla-sin-anuncios"
+// 🔥 NUEVA FUNCIÓN: PIDE LA LISTA DINÁMICA A WEXAIT 🔥
+async function obtenerProductosDesdeWexait() {
+    try {
+        console.log("\n[*] Consultando a Wexait la lista de productos de MAYFLUX actualizada...");
+        const res = await axios.get("https://wexait.com/api/lista-vigilancia-mayflux");
+        
+        if (res.data && res.data.length > 0) {
+            console.log(`✅ Wexait devolvió ${res.data.length} productos para vigilar en Mayflux.`);
+            return res.data;
+        }
+    } catch (error) {
+        console.log("[!] Error obteniendo la lista de Wexait. Asegúrate de que la ruta exista.");
     }
-];
+    return [];
+}
 
 // 🔥 FUNCIÓN MODIFICADA: Ahora recibe y envía 'cantidad_stock' 🔥
 async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, nombre_referencia) {
@@ -126,6 +54,14 @@ async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, 
 // 2. MOTOR DE SCRAPING 
 // ==============================================================================
 async function verificarStockProveedor() {
+    // 🔥 EL BOT AHORA PIDE LA LISTA ANTES DE ARRANCAR 🔥
+    const PRODUCTOS_A_VIGILAR = await obtenerProductosDesdeWexait();
+    
+    if (PRODUCTOS_A_VIGILAR.length === 0) {
+        console.log("⚠️ No hay productos con enlace de Mayflux en tu panel de Wexait. Saltando ciclo...");
+        return; 
+    }
+
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
     let browser;
     try {
@@ -284,7 +220,7 @@ function obtenerHoraColombia() {
 
 async function iniciarVigilancia() {
     console.log("=======================================================");
-    console.log("🚀 BOT VIGÍA (CON ESCUDO DE PROTECCIÓN) INICIADO");
+    console.log("🚀 BOT VIGÍA DE MAYFLUX (CON ESCUDO DE PROTECCIÓN) INICIADO");
     console.log("=======================================================");
 
     while (true) {
