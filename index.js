@@ -9,12 +9,12 @@ const TOKEN_SECRETO = "WexaitBot2026_Admin";
 
 const URL_LOGIN_MAYFLUX = "https://mayflux.com/login";
 const CORREO_PROVEEDOR = "Univedson1@gmail.com";
-const CONTRASENA_PROVEEDOR = "Univedson1@gmail.com"; // <-- RECUERDA PONER TU CLAVE REAL
+const CONTRASENA_PROVEEDOR = "Univedson1@gmail.com";
 
 // Memoria global para guardar los strikes de protección entre cada escaneo
 const MEMORIA_VIGILANTE = {};
 
-// 🔥 NUEVA FUNCIÓN: PIDE LA LISTA DINÁMICA A WEXAIT 🔥
+// PIDE LA LISTA DINÁMICA A WEXAIT
 async function obtenerProductosDesdeWexait() {
     try {
         console.log("\n[*] Consultando a Wexait la lista de productos de MAYFLUX actualizada...");
@@ -30,14 +30,14 @@ async function obtenerProductosDesdeWexait() {
     return [];
 }
 
-// 🔥 FUNCIÓN MODIFICADA: Ahora recibe y envía 'cantidad_stock' 🔥
+// RECIBE Y ENVÍA 'cantidad_stock'
 async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, nombre_referencia) {
     const estado_api = hay_stock ? 1 : 0;
     try {
         const params = new URLSearchParams();
         params.append('id', producto_id);
         params.append('status', estado_api);
-        params.append('stock', cantidad_stock); // <-- AQUÍ SE EMPACA EL NÚMERO
+        params.append('stock', cantidad_stock);
         params.append('token', TOKEN_SECRETO);
 
         const res = await axios.post(URL_WEXAIT, params);
@@ -54,7 +54,6 @@ async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, 
 // 2. MOTOR DE SCRAPING 
 // ==============================================================================
 async function verificarStockProveedor() {
-    // 🔥 EL BOT AHORA PIDE LA LISTA ANTES DE ARRANCAR 🔥
     const PRODUCTOS_A_VIGILAR = await obtenerProductosDesdeWexait();
     
     if (PRODUCTOS_A_VIGILAR.length === 0) {
@@ -65,7 +64,6 @@ async function verificarStockProveedor() {
     console.log("\n[+] Iniciando inspección de inventario en Mayflux con Puppeteer...");
     let browser;
     try {
-        // 🔥 CORRECCIÓN DE MEMORIA APLICADA AQUÍ 🔥
         browser = await puppeteer.launch({
             headless: "new",
             args: [
@@ -81,7 +79,6 @@ async function verificarStockProveedor() {
         const page = await browser.newPage();
         
         await page.setDefaultNavigationTimeout(60000); 
-
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
 
@@ -188,7 +185,6 @@ async function verificarStockProveedor() {
                     console.log("🛒 Producto con stock disponible.");
                 }
 
-                // 🔥 LÍNEA MODIFICADA: Le pasamos 'resultadoScraping.stockLeido' a la función 🔥
                 await actualizarProductoWexait(prod.id_wexait, hayStock, resultadoScraping.stockLeido, prod.nombre);
 
             } catch (error) {
@@ -200,9 +196,11 @@ async function verificarStockProveedor() {
 
     } catch (error) {
         console.error("❌ Error General de Puppeteer:", error.message);
+        console.log("🔄 Forzando cierre para liberar memoria RAM. Railway reiniciará desde cero...");
+        process.exit(1);
     } finally {
         if (browser) {
-            await browser.close();
+            await browser.close().catch(() => {});
             console.log("[*] Navegador cerrado para mantener el servidor optimizado.");
         }
     }
