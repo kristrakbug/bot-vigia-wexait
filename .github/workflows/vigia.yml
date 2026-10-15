@@ -2,8 +2,10 @@ name: Bot Vigia Mayflux (Cada 30 min)
 
 on:
   schedule:
-    # Corre a los minutos 0 y 30 de cada hora, entre 8:00 AM y 10:30 PM (Hora Colombia)
-    - cron: '0,30 13-23,0-3 * * *'
+    # De 8:05 AM a 6:35 PM (Hora Colombia)
+    - cron: '5,35 13-23 * * *'
+    # De 7:05 PM a 10:35 PM (Hora Colombia)
+    - cron: '5,35 0-3 * * *'
   workflow_dispatch:
 
 jobs:
