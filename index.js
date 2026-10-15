@@ -2,17 +2,14 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 
 // ==============================================================================
-// 1. CONFIGURACIÓN PRINCIPAL Y MEMORIA
+// 1. CONFIGURACIÓN PRINCIPAL (CON VARIABLES DE ENTORNO SEGURAS)
 // ==============================================================================
 const URL_WEXAIT = "https://wexait.com/api/v1/actualizar-inventario-secreto";
-const TOKEN_SECRETO = "WexaitBot2026_Admin";
+const TOKEN_SECRETO = process.env.TOKEN_SECRETO;
 
 const URL_LOGIN_MAYFLUX = "https://mayflux.com/login";
-const CORREO_PROVEEDOR = "Univedson1@gmail.com";
-const CONTRASENA_PROVEEDOR = "Univedson1@gmail.com";
-
-// Memoria global para guardar los strikes de protección entre cada escaneo
-const MEMORIA_VIGILANTE = {};
+const CORREO_PROVEEDOR = process.env.CORREO_PROVEEDOR;
+const CONTRASENA_PROVEEDOR = process.env.CONTRASENA_PROVEEDOR;
 
 // PIDE LA LISTA DINÁMICA A WEXAIT
 async function obtenerProductosDesdeWexait() {
@@ -50,14 +47,59 @@ async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, 
     }
 }
 
+// FUNCIÓN AUXILIAR PARA LEER LA PÁGINA
+async function extraerDatosPagina(page) {
+    return await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('button'));
+        const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('carrito'));
+        
+        let isBtnDisabled = false;
+        if (btnCarrito) {
+            isBtnDisabled = btnCarrito.disabled;
+        }
+
+        const spans = Array.from(document.querySelectorAll('span'));
+        const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
+        
+        let numeroStock = 0;
+        if (spanStock) {
+            const match = spanStock.innerText.match(/\d+/);
+            if (match) {
+                numeroStock = parseInt(match[0], 10);
+            }
+        }
+
+        let estado = 'agotado'; 
+        if (btnCarrito && !isBtnDisabled && numeroStock > 0) {
+            estado = 'disponible';
+        }
+
+        let diasDetectados = null;
+        const spanDias = spans.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
+        if (spanDias) {
+            const matchDias = spanDias.innerText.match(/(\d+)/);
+            if (matchDias) {
+                diasDetectados = parseInt(matchDias[0], 10);
+            }
+        }
+
+        return { estado, diasDetectados, stockLeido: numeroStock };
+    });
+}
+
 // ==============================================================================
 // 2. MOTOR DE SCRAPING 
 // ==============================================================================
 async function verificarStockProveedor() {
+    if (!CORREO_PROVEEDOR || !CONTRASENA_PROVEEDOR || !TOKEN_SECRETO) {
+        console.error("❌ Faltan las variables de entorno (Secrets) en GitHub.");
+        process.exit(1);
+    }
+
     const PRODUCTOS_A_VIGILAR = await obtenerProductosDesdeWexait();
     
     if (PRODUCTOS_A_VIGILAR.length === 0) {
-        console.log("⚠️ No hay productos con enlace de Mayflux en tu panel de Wexait. Saltando ciclo...");
+        console.log("⚠️ No hay productos con enlace de Mayflux en tu panel de Wexait. Cerrando...");
         return; 
     }
 
@@ -111,77 +153,36 @@ async function verificarStockProveedor() {
                 console.log("✅ Producto cargado.");
                 
                 await new Promise(r => setTimeout(r, 5000));
-
-                const resultadoScraping = await page.evaluate(() => {
-                    const btns = Array.from(document.querySelectorAll('button'));
-                    const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('carrito'));
-                    
-                    let isBtnDisabled = false;
-                    if (btnCarrito) {
-                        isBtnDisabled = btnCarrito.disabled;
-                    }
-
-                    const spans = Array.from(document.querySelectorAll('span'));
-                    const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
-                    
-                    let numeroStock = 0;
-                    if (spanStock) {
-                        const match = spanStock.innerText.match(/\d+/);
-                        if (match) {
-                            numeroStock = parseInt(match[0], 10);
-                        }
-                    }
-
-                    let estado = 'agotado'; 
-                    
-                    if (btnCarrito && !isBtnDisabled && numeroStock > 0) {
-                        estado = 'disponible';
-                    }
-
-                    let diasDetectados = null;
-                    const spanDias = spans.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
-                    if (spanDias) {
-                        const matchDias = spanDias.innerText.match(/(\d+)/);
-                        if (matchDias) {
-                            diasDetectados = parseInt(matchDias[0], 10);
-                        }
-                    }
-
-                    return { estado, diasDetectados, stockLeido: numeroStock };
-                });
+                let resultadoScraping = await extraerDatosPagina(page);
 
                 let hayStock = (resultadoScraping.estado === 'disponible');
                 console.log(`[🔍] Diagnóstico: Stock leído = ${resultadoScraping.stockLeido}, Días detectados = ${resultadoScraping.diasDetectados}`);
 
                 // ============================================================
-                // 🛡️ SISTEMA DE PROTECCIÓN DE MARGEN (STRIKES)
+                // 🛡️ SISTEMA DE PROTECCIÓN DE MARGEN (DOBLE VERIFICACIÓN)
                 // ============================================================
                 const matchEsperados = prod.nombre.match(/(\d+)\s*d[íi]as?/i);
                 const diasEsperados = matchEsperados ? parseInt(matchEsperados[1], 10) : null;
 
-                if (!MEMORIA_VIGILANTE[prod.id_wexait]) MEMORIA_VIGILANTE[prod.id_wexait] = { strikes: 0 };
-                const memoria = MEMORIA_VIGILANTE[prod.id_wexait];
-
                 if (hayStock && resultadoScraping.diasDetectados && diasEsperados) {
                     if (resultadoScraping.diasDetectados > diasEsperados) {
-                        memoria.strikes++;
-                        if (memoria.strikes >= 2) {
-                            hayStock = false; 
-                            console.log(`🛡️ ESCUDO ACTIVADO: La web dice ${resultadoScraping.diasDetectados} días (Tú esperas: ${diasEsperados}). Forzando a AGOTADO para proteger margen.`);
-                        } else {
-                            console.log(`⚠️ ALERTA: Posible cambio a ${resultadoScraping.diasDetectados} días. Strike ${memoria.strikes}/2.`);
+                        console.log(`⚠️ ALERTA (Strike 1/2): Posible cambio a ${resultadoScraping.diasDetectados} días. Re-verificando en 5 segundos...`);
+                        await new Promise(r => setTimeout(r, 5000));
+                        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
+                        await new Promise(r => setTimeout(r, 4000));
+                        
+                        resultadoScraping = await extraerDatosPagina(page);
+                        if (resultadoScraping.diasDetectados > diasEsperados) {
+                            hayStock = false;
+                            console.log(`🛡️ ESCUDO ACTIVADO (Strike 2/2): Confirmado ${resultadoScraping.diasDetectados} días (Esperabas: ${diasEsperados}). Forzando a AGOTADO.`);
                         }
-                    } else {
-                        memoria.strikes = 0; 
                     }
-                } else if (!hayStock) {
-                    memoria.strikes = 0; 
                 }
                 // ============================================================
 
-                if (!hayStock && memoria.strikes < 2) {
-                    console.log("⚠️ Producto detectado como AGOTADO en Mayflux.");
-                } else if (hayStock) {
+                if (!hayStock) {
+                    console.log("⚠️ Producto marcado como AGOTADO.");
+                } else {
                     console.log("🛒 Producto con stock disponible.");
                 }
 
@@ -196,43 +197,29 @@ async function verificarStockProveedor() {
 
     } catch (error) {
         console.error("❌ Error General de Puppeteer:", error.message);
-        console.log("🔄 Forzando cierre para liberar memoria RAM. Railway reiniciará desde cero...");
         process.exit(1);
     } finally {
         if (browser) {
             await browser.close().catch(() => {});
-            console.log("[*] Navegador cerrado para mantener el servidor optimizado.");
+            console.log("[*] Navegador cerrado.");
         }
     }
 }
 
 // ==============================================================================
-// 3. BUCLE DE TIEMPO 
+// 3. EJECUCIÓN ÚNICA PARA GITHUB ACTIONS
 // ==============================================================================
-function obtenerHoraColombia() {
-    const ahora = new Date();
-    const opciones = { timeZone: 'America/Bogota', hour: 'numeric', hour12: false };
-    const formateador = new Intl.DateTimeFormat('en-US', opciones);
-    return parseInt(formateador.format(ahora), 10);
-}
-
 async function iniciarVigilancia() {
     console.log("=======================================================");
-    console.log("🚀 BOT VIGÍA DE MAYFLUX (CON ESCUDO DE PROTECCIÓN) INICIADO");
+    console.log("🚀 BOT VIGÍA DE MAYFLUX (MODO GITHUB ACTIONS) INICIADO");
     console.log("=======================================================");
-
-    while (true) {
-        const horaActual = obtenerHoraColombia();
-        
-        if (horaActual >= 8) {
-            await verificarStockProveedor();
-            console.log("[*] Misión terminada. Esperando 45 minutos para el siguiente escaneo...");
-            await new Promise(r => setTimeout(r, 2700000)); // 45 minutos
-        } else {
-            console.log("[Noche COP] Horario inactivo. Bot en reposo nocturno (12 AM - 8 AM).");
-            await new Promise(r => setTimeout(r, 900000)); 
-        }
-    }
+    
+    await verificarStockProveedor();
+    
+    console.log("=======================================================");
+    console.log("🏁 Escaneo completado. Apagando contenedor hasta el próximo turno.");
+    console.log("=======================================================");
+    process.exit(0);
 }
 
 iniciarVigilancia();
