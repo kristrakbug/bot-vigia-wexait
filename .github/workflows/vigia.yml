@@ -1,0 +1,34 @@
+name: Bot Vigia Mayflux (Cada 45 min)
+
+on:
+  schedule:
+    # Ciclo exacto de 45 minutos entre las 8:00 AM y las 11:30 PM (Hora Colombia / UTC-5)
+    - cron: '0,45 13,16,19,22,1 * * *'
+    - cron: '30 14,17,20,23,2 * * *'
+    - cron: '15 15,18,21,0,3 * * *'
+  workflow_dispatch: # Botón manual para probar cuando quieras
+
+jobs:
+  escanear-mayflux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Descargar codigo del repositorio
+        uses: actions/checkout@v4
+
+      - name: 2. Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 3. Instalar dependencias y Chrome para Puppeteer
+        run: |
+          npm install
+          npx puppeteer browsers install chrome
+
+      - name: 4. Ejecutar Bot Vigia
+        env:
+          TOKEN_SECRETO: ${{ secrets.TOKEN_SECRETO }}
+          CORREO_PROVEEDOR: ${{ secrets.CORREO_PROVEEDOR }}
+          CONTRASENA_PROVEEDOR: ${{ secrets.CONTRASENA_PROVEEDOR }}
+        run: node index.js
