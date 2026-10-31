@@ -11,6 +11,23 @@ const URL_LOGIN_MAYFLUX = "https://mayflux.com/login";
 const CORREO_PROVEEDOR = process.env.CORREO_PROVEEDOR;
 const CONTRASENA_PROVEEDOR = process.env.CONTRASENA_PROVEEDOR;
 
+// GENERA VARIANTES CON Y SIN -1 (O CUALQUIER NÚMERO)
+function generarVariantesUrl(urlOriginal) {
+    if (!urlOriginal || typeof urlOriginal !== 'string') return [];
+    const urlLimpia = urlOriginal.trim().replace(/\/$/, '');
+    const variantes = [urlLimpia];
+
+    if (/-\d+$/.test(urlLimpia)) {
+        // Si termina en -1 o -2, probar también la versión limpia
+        variantes.push(urlLimpia.replace(/-\d+$/, ''));
+    } else {
+        // Si viene sin número al final, probar agregándole -1
+        variantes.push(`${urlLimpia}-1`);
+    }
+
+    return variantes;
+}
+
 // PIDE LA LISTA DINÁMICA A WEXAIT
 async function obtenerProductosDesdeWexait() {
     try {
@@ -50,37 +67,46 @@ async function actualizarProductoWexait(producto_id, hay_stock, cantidad_stock, 
 // FUNCIÓN AUXILIAR PARA LEER LA PÁGINA
 async function extraerDatosPagina(page) {
     return await page.evaluate(() => {
+        const bodyText = document.body ? document.body.innerText || '' : '';
+
+        // Si la página es 404 o no existe el producto
+        if (bodyText.includes('404') || bodyText.toLowerCase().includes('página no encontrada') || bodyText.toLowerCase().includes('producto no encontrado')) {
+            return { estado: 'no_existe', diasDetectados: null, stockLeido: 0 };
+        }
+
         const btns = Array.from(document.querySelectorAll('button'));
         const btnCarrito = btns.find(b => b.innerText && b.innerText.toLowerCase().includes('carrito'));
         
         let isBtnDisabled = false;
         if (btnCarrito) {
-            isBtnDisabled = btnCarrito.disabled;
+            isBtnDisabled = btnCarrito.disabled || btnCarrito.classList.contains('disabled');
         }
 
-        const spans = Array.from(document.querySelectorAll('span'));
-        const spanStock = spans.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
+        const elementosTexto = Array.from(document.querySelectorAll('span, div, p, b, strong'));
         
+        // 1. Detectar Stock
         let numeroStock = 0;
-        if (spanStock) {
-            const match = spanStock.innerText.match(/\d+/);
+        const elStock = elementosTexto.find(s => s.innerText && s.innerText.toLowerCase().includes('stock'));
+        if (elStock) {
+            const match = elStock.innerText.match(/stock[:\s]*(\d+)/i) || elStock.innerText.match(/\d+/);
             if (match) {
-                numeroStock = parseInt(match[0], 10);
+                numeroStock = parseInt(match[1] || match[0], 10);
+            }
+        }
+
+        // 2. Detectar Días
+        let diasDetectados = null;
+        const elDias = elementosTexto.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
+        if (elDias) {
+            const matchDias = elDias.innerText.match(/(\d+)\s*d[íi]as?/i);
+            if (matchDias) {
+                diasDetectados = parseInt(matchDias[1], 10);
             }
         }
 
         let estado = 'agotado'; 
         if (btnCarrito && !isBtnDisabled && numeroStock > 0) {
             estado = 'disponible';
-        }
-
-        let diasDetectados = null;
-        const spanDias = spans.find(s => s.innerText && s.innerText.toLowerCase().match(/\d+\s*d[íi]as?/i));
-        if (spanDias) {
-            const matchDias = spanDias.innerText.match(/(\d+)/);
-            if (matchDias) {
-                diasDetectados = parseInt(matchDias[0], 10);
-            }
         }
 
         return { estado, diasDetectados, stockLeido: numeroStock };
@@ -149,11 +175,33 @@ async function verificarStockProveedor() {
         for (const prod of PRODUCTOS_A_VIGILAR) {
             console.log(`\n🚀 Iniciando MISIÓN DE VIGILANCIA para: ${prod.nombre}`);
             try {
-                await page.goto(prod.url_proveedor, { waitUntil: 'networkidle2', timeout: 60000 });
-                console.log("✅ Producto cargado.");
-                
-                await new Promise(r => setTimeout(r, 5000));
-                let resultadoScraping = await extraerDatosPagina(page);
+                const urlsAProbar = generarVariantesUrl(prod.url_proveedor);
+                let resultadoScraping = { estado: 'agotado', diasDetectados: null, stockLeido: 0 };
+                let urlExitosa = prod.url_proveedor;
+
+                for (let i = 0; i < urlsAProbar.length; i++) {
+                    const urlActual = urlsAProbar[i];
+                    console.log(`[*] Inspeccionando intento (${i + 1}/${urlsAProbar.length}): ${urlActual}`);
+
+                    try {
+                        await page.goto(urlActual, { waitUntil: 'networkidle2', timeout: 45000 });
+                        await new Promise(r => setTimeout(r, 4000));
+
+                        const intento = await extraerDatosPagina(page);
+
+                        // Si la página cargó y detectó datos válidos (días o stock presente)
+                        if (intento.estado !== 'no_existe' && (intento.diasDetectados !== null || intento.stockLeido > 0)) {
+                            resultadoScraping = intento;
+                            urlExitosa = urlActual;
+                            console.log(`✅ Producto cargado correctamente desde: ${urlActual}`);
+                            break;
+                        } else {
+                            console.log(`⚠️ Enlace sin datos o 404 en ${urlActual}. Probando alternativa...`);
+                        }
+                    } catch (eNav) {
+                        console.log(`[!] Timeout navegando a ${urlActual}: ${eNav.message}`);
+                    }
+                }
 
                 let hayStock = (resultadoScraping.estado === 'disponible');
                 console.log(`[🔍] Diagnóstico: Stock leído = ${resultadoScraping.stockLeido}, Días detectados = ${resultadoScraping.diasDetectados}`);
